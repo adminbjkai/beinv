@@ -1,0 +1,58 @@
+# Feature spec (v2.3) — applies to all clients
+
+All three clients (web, Android, Apple TV) implement the same feature set with platform-native UI. Data comes only from the endpoints in [UPSTREAM_API.md](UPSTREAM_API.md).
+
+## 0. Parity rules (every client, same structure and wording)
+Top-to-bottom layout, identical labels:
+1. **League** switch: `Trendyol Süper Lig` | `İngiltere Premier Lig` (exact names).
+2. **Season** picker (label "Season") — always visible and selectable in every mode; changing it resets week to that season's default.
+3. **Week** picker (label "Week") with ‹ › — visible in Highlights and Goals modes; hidden only in By team.
+4. **Mode** switch: `Highlights` | `Goals` | `By team`.
+5. Mode-specific row:
+   - By team → **Team** picker (label "Team", logo + name, A–Z), then a `Matches` | `Goals` sub-switch, and — when Goals is active — a toggle `Only <Team> goals` (default ON).
+6. Content area.
+
+Every selection change must be reflected immediately and persist (see §1). No mode may dead-end: Back/Esc returns to the previous level.
+
+## 1. Navigation & selection
+- **League**: Trendyol Süper Lig / İngiltere Premier Lig.
+- **Season**: always-visible picker listing every season from endpoint A (newest first). Default: `isCurrent`.
+- **Week**: picker + ‹ › stepping. Default: `currentWeekForFixture`, else the last week.
+- **Remember** last league/season/week (web: URL + localStorage; Android: DataStore/SharedPreferences; tvOS: UserDefaults).
+
+## 2. Views (mode toggle)
+- **Highlights** (default): match cards for the selected week.
+- **Goals**: only goal clips (`type == 0`) for the selected week, grouped by match (match header: home logo, scoreline, away logo). Includes **Play all** → sequential playlist of every goal in the week.
+  - **Each goal card/row shows**: minute, scorer (event description), **scoring team** (logo + name derived from `eventTeamSide` Home/Away → that match's team), and the **running score after that goal** (e.g. `0–1`, `0–2`, …), computed by walking the match's goals in minute order and incrementing the side that scored. Own-goal/unknown side (`eventTeamSide` null): show the scoreline without the increment and mark the team as "—".
+  - Cards are visually attributed to the scoring team: team logo on the card, and the running score highlights the scoring side.
+- **By team**: pick a team → that team's matches for the whole selected season (all weeks fetched in parallel, cached per season; show progress while loading). Newest first, each card labelled with its week. Goals mode also applies here (all of that team's goals in the season, Play all).
+  - Team list is derived from the season's matches (home/away names + logos), deduplicated, sorted A-Z.
+  - In By team → Goals, the `Only <Team> goals` toggle (default ON) filters to goals where the scoring team is the selected team; OFF shows every goal in that team's matches (both sides). Play all respects the filter.
+
+## 2b. Playlists ("Play all") — user experience
+Design goal: the playlist reads like the season in order, the user always knows where they are and what comes next, and the video is never hidden by chrome.
+
+- **Order**: week ascending → kick-off time ascending → goal minute ascending. Scope = exactly the visible goals (mode + team + `Only <Team> goals`). Selecting a single goal opens the same ordered list positioned at it.
+- **Every item is labelled with its week**. Canonical item title (identical on all clients): `3. Hafta · Beşiktaş 2–1 Trabzonspor · 55' Jota Silva`. The player shows it as the current title plus `x of N`.
+- **Up next / Previous**: the player chrome shows the next item's title ("Up next: 4. Hafta · 12' …") and the previous one, so next/prev are never blind. On tvOS the same text goes into the item's `externalMetadata` subtitle and the info panel.
+- **Autoplay**: next item starts automatically; after the last item the player closes back to the list. Next/prev always available (web buttons + `n`/`p`; Android transport controls; tvOS Siri Remote skip + transport-bar items).
+- **Clip list placement (never covers the video)**:
+  - Phone portrait (Android): the ordered list sits **below** the player — grouped by week headers, current row highlighted and auto-scrolled, tap to jump. No overlay, no hamburger.
+  - Landscape phone / desktop web: a **side drawer** on the right, ≤ 35 % of the width, translucent (glass), toggled by a "Clips" button (`c` on web); video keeps playing and stays visible; tap outside / Esc / Back closes it.
+  - tvOS: the **native swipe-down info panel** (`customInfoViewControllers`) hosts the "Clips" tab: list grouped by week, current highlighted, select to jump. No custom full-screen overlay.
+- **Play all button** reads `Play all · N goals · from 1. Hafta` (first week in the list) so the order is obvious before pressing.
+
+## 3. Player
+- Plays the highest-quality (only) rendition: `highlightVideoUrl` / event `sourceVideoUrl`.
+- **Fullscreen** toggle (Android: landscape immersive, system bars hidden; web: Fullscreen API; tvOS: always full-screen).
+- **Playlist**: full highlight + every clip of the match; **next / previous** clip controls; **autoplay next** (on by default) and **loop-free** end state back to the list.
+- Resume position when switching back from a clip to the full highlight (best effort).
+- Controls: play/pause, seek ±10 s, scrubber with buffered indicator, volume/mute (web), PiP (web, Android), time display. Keyboard on web (space/k, ←/→, f, m, n/p for next/prev, Esc).
+
+## 4. Polish
+- Skeleton loaders, empty state ("No highlights published for this week yet."), error state with Retry.
+- Team logos, score, date (local tz), goal count badge on cards.
+- Focus/hover/pressed states; no purple anywhere (charcoal `#0B0F0E`, emerald `#19C37D`).
+
+## Out of scope (for now)
+Accounts, favourites sync, notifications, other leagues, downloads, HLS/ABR.

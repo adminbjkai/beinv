@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-bg: #0B0F0E;
+  --color-panel: #121917;
+  --color-line: #1f2a26;
+  --color-accent: #19C37D;
+  --color-accent-2: #5EEAD4;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: radial-gradient(1200px 600px at 20% -10%, rgba(25, 195, 125, .16), transparent 60%),
+              radial-gradient(900px 500px at 90% 0%, rgba(94, 234, 212, .10), transparent 60%),
+              var(--color-bg);
+  color: #e6ece9;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.glass {
+  background: rgba(18, 25, 23, .72);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, .06);
+}
+
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+button:active { transform: scale(.98); }
+
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a3b1ab' stroke-width='2.5'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right .7rem center;
+  padding-right: 2rem;
+}
+
+input[type=range] { -webkit-appearance: none; appearance: none; background: transparent; }
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 14px; height: 14px; border-radius: 999px;
+  background: #fff; box-shadow: 0 0 0 4px rgba(25, 195, 125, .35); cursor: pointer; margin-top: -5px;
+}
+input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: transparent; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+.fade-up { animation: fadeUp .35s ease both; }

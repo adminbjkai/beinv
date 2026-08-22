@@ -1,0 +1,65 @@
+name: Highlights
+options:
+  bundleIdPrefix: ai.bjk
+  deploymentTarget:
+    tvOS: "17.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: 49YXZ5DBB4
+    TARGETED_DEVICE_FAMILY: "3"
+targets:
+  Highlights:
+    type: application
+    platform: tvOS
+    deploymentTarget: "17.0"
+    sources:
+      - Highlights
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.bjk.highlights
+        ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon & Top Shelf Image"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Highlights
+        INFOPLIST_KEY_UIUserInterfaceStyle: Dark
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+  HighlightsUITests:
+    type: bundle.ui-testing
+    platform: tvOS
+    deploymentTarget: "17.0"
+    sources:
+      - HighlightsUITests
+    dependencies:
+      - target: Highlights
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.bjk.highlights.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Highlights
+  HighlightsTests:
+    type: bundle.unit-test
+    platform: tvOS
+    deploymentTarget: "17.0"
+    sources:
+      - HighlightsTests
+    dependencies:
+      - target: Highlights
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.bjk.highlights.tests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Highlights:
+    build:
+      targets:
+        Highlights: all
+        HighlightsUITests: [test]
+        HighlightsTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - HighlightsTests
+        - HighlightsUITests
