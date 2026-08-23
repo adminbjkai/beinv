@@ -14,9 +14,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,6 +40,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -56,7 +56,7 @@ private fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-@OptIn(UnstableApi::class)
+@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
     val context = LocalContext.current
@@ -107,10 +107,15 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
                 if (i in clips.indices) current = i
             }
             override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
-                // Only remember a genuine mid-clip position. On an auto-transition `old.positionMs`
-                // is the clip's end, so storing it would make re-selecting that clip seek to its last
-                // frame — it would end instantly and skip on (or close the player, on the last clip).
-                if (old.mediaItemIndex != new.mediaItemIndex && reason != Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                // Only a genuine mid-clip position is worth remembering. On an auto-transition
+                // `old.positionMs` is the clip's end, so storing it would make re-selecting that clip
+                // seek to its last frame — it would end instantly and skip on (or close the player).
+                if (old.mediaItemIndex == new.mediaItemIndex) return
+                if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                    // The clip finished: drop any earlier mid-clip position so re-selecting it
+                    // restarts from the beginning instead of resuming near its last frame.
+                    positions.remove(old.mediaItemIndex)
+                } else {
                     positions[old.mediaItemIndex] = old.positionMs
                 }
             }
@@ -168,7 +173,7 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
         .then(if (fullscreen || inPip) Modifier else Modifier.statusBarsPadding())) {
         if (!fullscreen && !inPip) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
-                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "Back") }
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 Column(Modifier.weight(1f)) {
                     Text(
                         "${current + 1} of ${clips.size}", color = Emerald, style = MaterialTheme.typography.labelMedium,
@@ -209,7 +214,7 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
                 modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
                     .clip(RoundedCornerShape(20.dp)).background(Color.Black.copy(alpha = 0.45f)),
             ) {
-                Icon(if (drawer) Icons.Default.Close else Icons.Default.List, null, tint = Emerald)
+                Icon(if (drawer) Icons.Default.Close else Icons.AutoMirrored.Filled.List, null, tint = Emerald)
                 Spacer(Modifier.width(4.dp)); Text("Clips", color = Emerald)
             }
             if (drawer) Column(
@@ -223,7 +228,9 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
                 )
                 NextPrevBar(upNext, previous, compact = true)
                 val drawerState = rememberLazyListState()
-                LaunchedEffect(current) { drawerState.animateScrollToItem((rowIndex[current] - 1).coerceAtLeast(0)) }
+                LaunchedEffect(current) {
+                    if (current in clips.indices) drawerState.animateScrollToItem((rowIndex[current] - 1).coerceAtLeast(0))
+                }
                 LazyColumn(state = drawerState, contentPadding = PaddingValues(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     clipRows(clips, current, compact = true) { select(it) }
                 }
@@ -301,9 +308,9 @@ private fun LazyListScope.clipRows(clips: List<Clip>, current: Int, compact: Boo
                     Text(c.scorer ?: c.title, color = if (sel) Emerald else OnDark, fontSize = if (compact) 14.sp else 15.sp,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                         fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal)
-                    if (c.goal && !compact) Text(c.subtitle?.substringBefore(" · ")?.let { "$it · " }.orEmpty() + c.title.substringAfter(" · ").substringBefore(" · "),
-                        color = TextGray, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    else if (!c.goal && c.subtitle != null) Text(c.subtitle, color = TextGray, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val second = if (c.goal) c.match ?: c.subtitle else c.subtitle
+                    if (!compact && second != null)
+                        Text(second, color = TextGray, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 if (c.score != null) {
                     Spacer(Modifier.width(6.dp))

@@ -1,4 +1,4 @@
-# Feature spec (v2.5) — applies to all clients
+# Feature spec (v2.6) — applies to all clients
 
 All three clients (web, Android, Apple TV) implement the same feature set with platform-native UI. Data comes only from the endpoints in [UPSTREAM_API.md](UPSTREAM_API.md).
 
@@ -52,7 +52,9 @@ Design goal: the playlist reads like the season in order, the user always knows 
 
 ## 4. Polish
 - Skeleton loaders, empty state ("No highlights published for this week yet."), error state with Retry.
-- Team logos, score, date (local tz), goal count badge on cards.
+- Team logos, score, date (local tz), goal count badge on cards. A score upstream did not report
+  renders as an en dash `–` on every client — never as `0`, which is indistinguishable from a real
+  goalless draw.
 - Focus/hover/pressed states; no purple anywhere (charcoal `#0B0F0E`, emerald `#19C37D`).
 
 ## Out of scope (for now)

@@ -51,15 +51,19 @@ data class Match(
 ) {
     val title get() = highLightTitle ?: "${homeTeam?.name ?: ""} - ${awayTeam?.name ?: ""}"
     val scoreLine get() =
-        "${homeTeam?.name ?: ""} ${homeTeam?.matchScore ?: "-"}–${awayTeam?.matchScore ?: "-"} ${awayTeam?.name ?: ""}"
+        "${homeTeam?.name ?: ""} ${scoreText(homeTeam)}–${scoreText(awayTeam)} ${awayTeam?.name ?: ""}"
     fun goals() = matchEvents.orEmpty().filter { it.isGoal && it.playUrl != null }
 
-    /** Full highlight followed by every clip of the match. */
+    /** Full highlight (when there is one) followed by every clip of the match. */
     fun clips(): List<Clip> = buildList {
-        add(Clip("Full highlight", scoreLine, highlightVideoUrl!!, false))
+        highlightVideoUrl?.takeIf { it.isNotBlank() }
+            ?.let { add(Clip("Full highlight", scoreLine, it, false, match = scoreLine)) }
         matchEvents.orEmpty().forEach { e -> if (e.playUrl != null) add(e.clip(this@Match)) }
     }
 }
+
+/** A score upstream did not report renders as an en dash on every client. */
+fun scoreText(t: Team?): String = t?.matchScore?.toString() ?: "–"
 
 @Serializable
 data class Team(
@@ -86,7 +90,11 @@ data class MatchEvent(
         else -> null
     }
     val playUrl get() = sourceVideoUrl?.takeIf { it.isNotBlank() } ?: videoUrl?.takeIf { it.isNotBlank() }
-    fun clip(m: Match) = Clip("${minute ?: "?"}' ${description ?: ""}".trim(), m.scoreLine, playUrl!!, isGoal)
+    fun clip(m: Match) = Clip(
+        "${minute ?: "?"}' ${description ?: ""}".trim(), m.scoreLine, playUrl!!, isGoal,
+        minute = minute, scorer = description, match = m.scoreLine,
+        logo = when (side) { Side.Home -> m.homeTeam?.logo; Side.Away -> m.awayTeam?.logo; null -> null },
+    )
 }
 
 enum class Side { Home, Away }
@@ -113,6 +121,7 @@ data class GoalRow(
         "${team?.name ?: "—"} · $scoreText",
         event.playUrl!!, true,
         minute = event.minute, scorer = event.description, logo = team?.logo, score = scoreText, week = week,
+        match = "${match.homeTeam?.name ?: ""} $scoreText ${match.awayTeam?.name ?: ""}".trim(),
     )
 }
 
@@ -145,6 +154,8 @@ data class Clip(
     // Goal-only metadata for the in-player clip selector (null for full highlights / non-goal clips).
     val minute: Int? = null, val scorer: String? = null, val logo: String? = null,
     val score: String? = null, val week: String? = null,
+    /** Match line shown under the scorer (`Beşiktaş 2–1 Trabzonspor`). */
+    val match: String? = null,
 )
 
 data class Playlist(val title: String, val clips: List<Clip>, val start: Int = 0)

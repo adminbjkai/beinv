@@ -34,6 +34,31 @@ final class PlayerCoordinatorTests: XCTestCase {
         XCTAssertEqual(c.player.items().count, 1)
     }
 
+    /// The end-of-item observer runs inside `MainActor.assumeIsolated`, which traps if the
+    /// notification is ever delivered off the main actor. Exercise that path for real: advancing
+    /// to the next clip, and dismissing after the last one.
+    func testEndOfItemAdvancesThenDismisses() {
+        let list = clips(2)
+        var dismissed = false
+        let c = PlayerView.Coordinator(clips: list, dismiss: { dismissed = true })
+        c.jump(to: 0)
+
+        let first = c.player.items()[0]
+        NotificationCenter.default.post(name: .AVPlayerItemDidPlayToEndTime, object: first)
+        let advanced = expectation(description: "advanced to clip 1")
+        DispatchQueue.main.async { advanced.fulfill() }
+        wait(for: [advanced], timeout: 2)
+        XCTAssertEqual(c.index, 1, "finishing clip 0 should advance the tracked index")
+        XCTAssertFalse(dismissed)
+
+        let last = c.player.items()[1]
+        NotificationCenter.default.post(name: .AVPlayerItemDidPlayToEndTime, object: last)
+        let closed = expectation(description: "dismissed after last clip")
+        DispatchQueue.main.async { closed.fulfill() }
+        wait(for: [closed], timeout: 2)
+        XCTAssertTrue(dismissed, "the last clip ending should close the player")
+    }
+
     func testOrderedGoalPlaylist() {
         func match(id: Int, round: Int, date: String, goals: [(Int, String)]) -> Match {
             var m = Match(matchId: id, matchDate: date, homeTeam: Team(name: "H\(id)", matchScore: 1), awayTeam: Team(name: "A\(id)", matchScore: 0),

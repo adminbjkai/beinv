@@ -45,7 +45,7 @@ export default function App() {
   const [autoNext, setAutoNext] = useState(init.an)
   const [playing, setPlaying] = useState<Playing>()
 
-  // defaults: current season + current week (falls back to first week)
+  // defaults: current season + current week (falls back to the last week, see `defaultWeek`)
   useEffect(() => {
     const known = seasons.data?.find(x => x.id === seasonId)
     if (known && round) return
@@ -151,7 +151,7 @@ export default function App() {
         </h1>
         <div className="glass flex flex-wrap rounded-xl p-1">
           {(leagues.data ?? []).map(l => (
-            <button key={l.id} onClick={() => { setLeague(l.id); setTeam(undefined) }}
+            <button key={l.id} onClick={() => { setLeague(l.id); setTeam(undefined); setSeasonId(undefined); setRound(undefined) }}
               className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${league === l.id ? 'bg-white text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}>
               {l.name}
             </button>

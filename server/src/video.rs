@@ -44,7 +44,5 @@ pub async fn proxy(client: &reqwest::Client, mp4: &str, req_headers: &HeaderMap)
             }
         }
     }
-    builder
-        .body(Body::from_stream(resp.bytes_stream()))
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    builder.body(Body::from_stream(resp.bytes_stream())).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }

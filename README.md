@@ -75,6 +75,7 @@ Dev loop with hot reload: run the server, then `cd web && npm run dev` (Vite pro
 Env: `BIND` (default `127.0.0.1:8080`), `WEB_DIST` (default `../web/dist`), `RUST_LOG`.
 
 Unit tests: `cd web && npm test` (`node --test src/*.test.ts`; Node ≥ 22.18 strips types natively, and `tsconfig.app.json` excludes `*.test.ts` from `tsc -b`). Lint: `npm run lint` (oxlint).
+Server: `cargo clippy --all-targets` and `cargo fmt` (`server/rustfmt.toml` pins the repo's own width, so `fmt` is a no-op on a clean tree).
 
 ### Docker
 
@@ -93,10 +94,10 @@ docker compose logs -f
 | `GET /api/leagues/{id}/seasons` | `[{id,name,is_current,weeks:[{round,name,is_current}]}]` (cache 1 h) |
 | `GET /api/leagues/{id}/seasons/{seasonId}/weeks/{round}` | `[{id,round,title,date,home,away,thumb,has_highlight,events[]}]` (cache 5 min) |
 | `GET /api/leagues/{id}/seasons/{seasonId}/matches` | every match of the season: all weeks fetched concurrently (≤ 8 in flight), merged, de-duplicated by id, sorted by date, each tagged with `round` (cache 10 min). Powers "By team". |
-| `GET /video/m/{matchId}?l=&s=&r=` | full highlight mp4, honours `Range` |
-| `GET /video/e/{eventId}?l=&s=&r=` | goal / position clip mp4, honours `Range` |
+| `GET /video/m/{matchId}[?l=&s=&r=]` | full highlight mp4, honours `Range` |
+| `GET /video/e/{eventId}[?l=&s=&r=]` | goal / position clip mp4, honours `Range` |
 
-The `l/s/r` query lets a cold server re-fetch the week to find the video source (`r` is the match's own `round`, so it also works for matches found via the season route). The SPA keeps state in the URL and mirrors it to `localStorage` (`beinv.v2`); URL wins over storage. Params: `l` league · `s` season id · `r` week (round) · `mode` `goals` | `team` (omitted = Highlights) · `t` team name (By team) · `g=1` Goals sub-switch in By team · `og=0/1` "Only <Team> goals" toggle (default `1`, only written when `g=1`) · `m` open match id · `play=all` open "Play all" for the visible goals on load · `clips=1` open the in-player clip selector on load (the last two are read once and not written back). The autoplay-next toggle is stored only in `localStorage`.
+The `l/s/r` query lets a cold server re-fetch the week to find the video source (`r` is the match's own `round`, so it also works for matches found via the season route). It is optional and only consulted on a cache miss, so a warm server answers a bare `/video/{kind}/{id}`. The SPA keeps state in the URL and mirrors it to `localStorage` (`beinv.v2`); URL wins over storage. Params: `l` league · `s` season id · `r` week (round) · `mode` `goals` | `team` (omitted = Highlights) · `t` team name (By team) · `g=1` Goals sub-switch in By team · `og=0/1` "Only <Team> goals" toggle (default `1`, only written when `g=1`) · `m` open match id · `play=all` open "Play all" for the visible goals on load · `clips=1` open the in-player clip selector on load (the last two are read once and not written back). The autoplay-next toggle is stored only in `localStorage`.
 
 Views (mode toggle): **Highlights** (match cards for the week) · **Goals** (goal clips grouped by match, "Play all" runs them as one playlist) · **By team** (team picker derived from the season's matches; that team's matches newest-first labelled by week, with a Matches / Goals sub-toggle and an "Only <Team> goals" toggle). Layout order follows [FEATURES.md §0](docs/FEATURES.md): League → Season → Week (hidden in By team) → Mode → mode row → content; picking a season resets the week to that season's default.
 

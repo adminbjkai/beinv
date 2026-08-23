@@ -12,8 +12,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -170,7 +170,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                     Text("Week", color = TextGray, style = MaterialTheme.typography.labelLarge)
                     val wi = weeks.indexOfFirst { it.round == round }
                     IconButton(onClick = { if (wi > 0) round = weeks[wi - 1].round }, enabled = wi > 0) {
-                        Icon(Icons.Default.KeyboardArrowLeft, "Previous week")
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous week")
                     }
                     Dropdown(
                         label = weeks.getOrNull(wi)?.weekName ?: "Week",
@@ -180,7 +180,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                     IconButton(
                         onClick = { if (wi in 0 until weeks.size - 1) round = weeks[wi + 1].round },
                         enabled = wi in 0 until weeks.size - 1,
-                    ) { Icon(Icons.Default.KeyboardArrowRight, "Next week") }
+                    ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next week") }
                 }
                 Segmented(Mode.entries.map { it.label }, mode.ordinal) { mode = Mode.entries[it] }
                 if (mode == Mode.ByTeam) {
@@ -243,8 +243,10 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                                         .sortedByDescending { it.match.matchDate ?: "" }
                                         .map { Entry(weekName(it.round), it.round, it.match) }
                                 }
-                                val filter: (GoalRow) -> Boolean =
-                                    if (onlyTeam) ({ it.team?.name == t.name }) else ({ true })
+                                // Stable identity so GoalsView's `remember` below actually holds.
+                                val filter: (GoalRow) -> Boolean = remember(onlyTeam, t.name) {
+                                    if (onlyTeam) ({ g: GoalRow -> g.team?.name == t.name }) else ({ _: GoalRow -> true })
+                                }
                                 Content(mine, goalsOnly = teamGoals, onPlay = onPlay, title = t.name, goalFilter = filter,
                                     emptyMsg = "No highlights for ${t.name} this season yet.")
                             }
@@ -299,9 +301,18 @@ private fun MatchGrid(entries: List<Entry>, onPlay: (Playlist) -> Unit) {
 private fun GoalsView(
     entries: List<Entry>, title: String, goalFilter: (GoalRow) -> Boolean, onPlay: (Playlist) -> Unit,
 ) {
-    val groups = entries.map { (w, r, m) -> Triple(w, m, m.goalRows(r, w).filter(goalFilter)) }.filter { it.third.isNotEmpty() }
-    val ordered = orderedPlaylist(groups.flatMap { it.third })
-    val all = ordered.map { it.clip() }
+    // Walking every match's goals and sorting the playlist is O(nlogn) over a whole season —
+    // far too much to redo on each recomposition.
+    val groups = remember(entries, goalFilter) {
+        entries.map { (w, r, m) -> Triple(w, m, m.goalRows(r, w).filter(goalFilter)) }.filter { it.third.isNotEmpty() }
+    }
+    val ordered = remember(groups) { orderedPlaylist(groups.flatMap { it.third }) }
+    val all = remember(ordered) { ordered.map { it.clip() } }
+    // Row → playlist position, so opening one goal does not scan the list with deep equality.
+    val positionOf = remember(ordered) {
+        ordered.withIndex().associate { (i, r) -> (r.match.matchId to r.event.id) to i }
+    }
+    val multiWeek = remember(entries) { entries.distinctBy { it.week }.size > 1 }
     if (all.isEmpty()) {
         Centered { Text("No goal clips for this selection.", color = TextGray, textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp)) }
         return
@@ -326,12 +337,15 @@ private fun GoalsView(
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.width(8.dp))
                     AsyncImage(m.awayTeam?.logo, m.awayTeam?.name, Modifier.size(20.dp))
-                    if (w != null && entries.distinctBy { it.week }.size > 1)
+                    if (w != null && multiWeek)
                         Text("  $w", color = TextGray, style = MaterialTheme.typography.labelSmall)
                 }
             }
             items(goals.size) { i ->
-                GoalCard(goals[i]) { onPlay(Playlist("$title · all goals", all, ordered.indexOf(goals[i]).coerceAtLeast(0))) }
+                val g = goals[i]
+                GoalCard(g) {
+                    onPlay(Playlist("$title · all goals", all, positionOf[g.match.matchId to g.event.id] ?: 0))
+                }
             }
         }
     }
@@ -516,7 +530,7 @@ private fun MatchCard(m: Match, weekLabel: String?, onClick: () -> Unit) {
         ) {
             AsyncImage(m.homeTeam?.logo, m.homeTeam?.name, Modifier.size(22.dp))
             Text(
-                "${m.homeTeam?.matchScore ?: "-"} : ${m.awayTeam?.matchScore ?: "-"}",
+                "${scoreText(m.homeTeam)} : ${scoreText(m.awayTeam)}",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.weight(1f),

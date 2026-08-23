@@ -144,11 +144,18 @@ struct Match: Codable, Hashable, Identifiable {
             return GoalRow(event: g, match: self, side: g.side, home: h, away: a)
         }
     }
-    var date: Date? { matchDate.flatMap { ISO8601DateFormatter().date(from: $0) } }
+    /// Shared: `date` is read inside sort comparators over a whole season, and building an
+    /// `ISO8601DateFormatter` per access dominated that work. Parsing is thread-safe.
+    private static let iso = ISO8601DateFormatter()
+    var date: Date? { matchDate.flatMap { Match.iso.date(from: $0) } }
+    /// A score upstream did not report renders as an en dash on every client (never as 0).
+    static func scoreText(_ t: Team?) -> String { t?.matchScore.map(String.init) ?? "–" }
     /// `Beşiktaş 2–1 Trabzonspor` (en dash) — used in the canonical playlist title.
-    var score: String { "\(homeTeam?.name ?? "?") \(homeTeam?.matchScore ?? 0)–\(awayTeam?.matchScore ?? 0) \(awayTeam?.name ?? "?")" }
+    var score: String {
+        "\(homeTeam?.name ?? "?") \(Match.scoreText(homeTeam))–\(Match.scoreText(awayTeam)) \(awayTeam?.name ?? "?")"
+    }
     var scoreline: String {
-        "\(homeTeam?.name ?? "?") \(homeTeam?.matchScore ?? 0)-\(awayTeam?.matchScore ?? 0) \(awayTeam?.name ?? "?")"
+        "\(homeTeam?.name ?? "?") \(Match.scoreText(homeTeam))-\(Match.scoreText(awayTeam)) \(awayTeam?.name ?? "?")"
     }
     var title: String {
         if let t = highLightTitle, !t.isEmpty { return t }

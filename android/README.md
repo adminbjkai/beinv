@@ -4,7 +4,7 @@ Small native Android app (Kotlin, Jetpack Compose, Media3 ExoPlayer) that lists 
 match highlights from beinsports.com.tr (Süper Lig and Premier League) and plays them.
 Self-contained: it calls the public beIN endpoints directly, no backend.
 
-## Features (v2.5 spec, `docs/FEATURES.md`)
+## Features (v2.6 spec, `docs/FEATURES.md`)
 
 - Layout per §0 parity rules, top to bottom: **League** (`Trendyol Süper Lig` | `İngiltere Premier Lig`) →
   **Season** (always visible; changing it resets the week to that season's default) → **Week** (‹ ›, hidden in

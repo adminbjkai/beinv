@@ -61,10 +61,14 @@ struct PlayerView: UIViewControllerRepresentable {
             self.clips = clips; self.dismiss = dismiss
             super.init()
             player.actionAtItemEnd = .advance                    // autoplay next (AVQueuePlayer default, made explicit)
+            // `queue: .main` guarantees main-thread delivery, but the closure is `@Sendable`, so the
+            // main-actor state below has to be reached through an explicit assumption.
             observer = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: nil, queue: .main) { [weak self] n in
-                guard let self, let item = n.object as? AVPlayerItem, let pos = self.queued.firstIndex(of: item) else { return }
-                if item == self.queued.last { self.dismiss() }           // last item of the playlist → back to the list
-                else { self.index = self.queueBase + pos + 1 }          // AVQueuePlayer advances itself; track the index
+                MainActor.assumeIsolated {
+                    guard let self, let item = n.object as? AVPlayerItem, let pos = self.queued.firstIndex(of: item) else { return }
+                    if item == self.queued.last { self.dismiss() }       // last item of the playlist → back to the list
+                    else { self.index = self.queueBase + pos + 1 }      // AVQueuePlayer advances itself; track the index
+                }
             }
         }
 
@@ -287,10 +291,14 @@ final class ImageCache {
     }
 }
 
+/// The clip a `ClipsView` row opened, as a presentation item.
+/// (A retroactive `Int: Identifiable` conformance would warn, and is an error in Swift 6.)
+private struct StartAt: Identifiable { let id: Int }
+
 /// Clips list (press-and-hold on a card). Selecting a clip opens the playlist at that clip.
 struct ClipsView: View {
     let match: Match
-    @State private var start: Int?
+    @State private var start: StartAt?
 
     var body: some View {
         ZStack {
@@ -300,7 +308,7 @@ struct ClipsView: View {
                 ScrollView {
                     LazyVStack(spacing: 12) {
                         ForEach(Array(match.playlist.enumerated()), id: \.element.id) { i, c in
-                            Button { start = i } label: {
+                            Button { start = StartAt(id: i) } label: {
                                 HStack(spacing: 16) {
                                     Circle().fill(c.isGoal ? Theme.accent : Color.clear)
                                         .overlay(Circle().stroke(Theme.secondaryText, lineWidth: c.isGoal ? 0 : 2))
@@ -319,8 +327,6 @@ struct ClipsView: View {
             }
             .padding(60)
         }
-        .fullScreenCover(item: $start) { PlayerView(clips: match.playlist, startIndex: $0).ignoresSafeArea() }
+        .fullScreenCover(item: $start) { PlayerView(clips: match.playlist, startIndex: $0.id).ignoresSafeArea() }
     }
 }
-
-extension Int: Identifiable { public var id: Int { self } }

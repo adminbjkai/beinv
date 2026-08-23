@@ -29,6 +29,12 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
   ordering, dead code / unused dependencies removed, Docker packaging documented and hardened,
   docs re-checked line by line against the code ([reports/review-v2.5.md](reports/review-v2.5.md)).
 
+## v2.6 — polish & runtime validation ✅
+- Every client built and run (emulator / simulator / headless Chrome / live server) rather than only
+  read; upstream contract re-measured. Correctness and a11y fixes on web, resilience fixes on the
+  server, a visible metadata bug and hot-path allocations on Android, warnings to zero on Android and
+  tvOS ([reports/review-v2.6.md](reports/review-v2.6.md)).
+
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.
 - Search (team / player name in event descriptions).

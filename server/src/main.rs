@@ -107,9 +107,26 @@ async fn season_matches(
                     load_week(&app, lg, season, r).await
                 });
             }
+            // A single failing week must not blank the whole season: log it and keep the rest.
+            // (Weeks with nothing published already decode to an empty list, so this is only
+            // reached on a real transport/HTTP error.)
             let mut all: Vec<Match> = Vec::new();
+            let mut failed = 0usize;
             while let Some(res) = set.join_next().await {
-                all.extend(res??.iter().cloned());
+                match res {
+                    Ok(Ok(ms)) => all.extend(ms.iter().cloned()),
+                    Ok(Err(e)) => {
+                        failed += 1;
+                        tracing::warn!("season {season}: week failed: {e}")
+                    }
+                    Err(e) => {
+                        failed += 1;
+                        tracing::warn!("season {season}: week task failed: {e}")
+                    }
+                }
+            }
+            if all.is_empty() && failed > 0 {
+                anyhow::bail!("all {failed} weeks of season {season} failed");
             }
             let mut seen = HashSet::new();
             all.retain(|m| seen.insert(m.id));
@@ -133,19 +150,20 @@ async fn video(
     let src = match app.sources.get(&key).await {
         Some(s) => s,
         None => {
-            let lg = bein::league(&q.l).ok_or(StatusCode::NOT_FOUND)?;
-            load_week(&app, lg, q.s, q.r).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+            // Cold cache: the l/s/r hint tells us which week to re-fetch. It is optional so a
+            // warm-cache hit still works for a bare `/video/{kind}/{id}`.
+            let (Some(l), Some(s), Some(r)) = (q.l.as_deref(), q.s, q.r) else {
+                return Err(StatusCode::NOT_FOUND);
+            };
+            let lg = bein::league(l).ok_or(StatusCode::NOT_FOUND)?;
+            load_week(&app, lg, s, r).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
             app.sources.get(&key).await.ok_or(StatusCode::NOT_FOUND)?
         }
     };
-    let mp4 = app
-        .resolved
-        .try_get_with(src.clone(), video::resolve(&app.noredirect, &src))
-        .await
-        .map_err(|e| {
-            tracing::warn!("resolve failed: {e}");
-            StatusCode::BAD_GATEWAY
-        })?;
+    let mp4 = app.resolved.try_get_with(src.clone(), video::resolve(&app.noredirect, &src)).await.map_err(|e| {
+        tracing::warn!("resolve failed: {e}");
+        StatusCode::BAD_GATEWAY
+    })?;
     video::proxy(&app.http, &mp4, &headers).await
 }
 
@@ -157,11 +175,8 @@ async fn main() {
 
     let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126 Safari/537.36";
     let http = reqwest::Client::builder().user_agent(ua).build().unwrap();
-    let noredirect = reqwest::Client::builder()
-        .user_agent(ua)
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap();
+    let noredirect =
+        reqwest::Client::builder().user_agent(ua).redirect(reqwest::redirect::Policy::none()).build().unwrap();
 
     let app = App {
         http,

@@ -415,7 +415,7 @@ struct MatchHeader: View {
     var body: some View {
         HStack(spacing: 16) {
             logo(match.homeTeam)
-            Text("\(match.homeTeam?.name ?? "?")  \(match.homeTeam?.matchScore ?? 0)–\(match.awayTeam?.matchScore ?? 0)  \(match.awayTeam?.name ?? "?")")
+            Text("\(match.homeTeam?.name ?? "?")  \(Match.scoreText(match.homeTeam))–\(Match.scoreText(match.awayTeam))  \(match.awayTeam?.name ?? "?")")
                 .font(.headline).monospacedDigit()
             logo(match.awayTeam)
             if let w = week { Text("· \(w)").font(.headline).foregroundStyle(Theme.accent) }
@@ -488,7 +488,7 @@ struct MatchCard: View {
             }
             HStack(spacing: 14) {
                 logo(match.homeTeam)
-                Text("\(match.homeTeam?.matchScore ?? 0) - \(match.awayTeam?.matchScore ?? 0)")
+                Text("\(Match.scoreText(match.homeTeam)) - \(Match.scoreText(match.awayTeam))")
                     .font(.title3).bold().monospacedDigit()
                 logo(match.awayTeam)
                 Spacer()

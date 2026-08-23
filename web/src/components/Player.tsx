@@ -34,6 +34,7 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   const [waiting, setWaiting] = useState(false)
   const [clips, setClips] = useState(initialClips)
   const drawer = useRef<HTMLElement>(null)
+  const clipsBtn = useRef<HTMLButtonElement>(null)
   const clipsRef = useRef(clips)
   useEffect(() => { clipsRef.current = clips; if (clips) setShow(true) }, [clips])
   const hideTimer = useRef<number | undefined>(undefined)
@@ -108,8 +109,11 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName
-      if (tag === 'SELECT' || tag === 'INPUT') return
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      // Space/Enter on a focused control must activate it, not toggle playback.
+      if (tag === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return
       switch (e.key) {
         case ' ': case 'k': e.preventDefault(); toggle(); break
         case 'ArrowLeft': seekBy(-10); break
@@ -129,7 +133,11 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   }, [toggle, seekBy, fullscreen, poke, step])
   useEffect(() => {
     if (!clips) return
-    const onDown = (e: MouseEvent) => { if (!drawer.current?.contains(e.target as Node)) setClips(false) }
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node
+      // Ignore the toggle itself: closing here would let its own click re-open the drawer.
+      if (!drawer.current?.contains(t) && !clipsBtn.current?.contains(t)) setClips(false)
+    }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [clips])
@@ -220,7 +228,7 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
               Autoplay {autoNext ? 'on' : 'off'}
             </button>
             {items.length > 1 && (
-              <button onClick={() => setClips(c => !c)} aria-pressed={clips} aria-label="Clips (c)" className={`${btn} ${clips ? 'text-accent' : ''}`}>Clips</button>
+              <button ref={clipsBtn} onClick={() => setClips(c => !c)} aria-pressed={clips} aria-label="Clips (c)" className={`${btn} ${clips ? 'text-accent' : ''}`}>Clips</button>
             )}
             <button onClick={pip} className={btn}>PiP</button>
             <button onClick={fullscreen} className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-white/10" aria-label="Fullscreen (f)">

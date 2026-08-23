@@ -151,9 +151,11 @@ pub async fn fetch_week(client: &reqwest::Client, lg: League, season: u64, round
     Ok(out)
 }
 
+/// `?l=&s=&r=` hint on `/video/*`, letting a cold server re-fetch the week that owns a
+/// source. All optional: a warm cache needs none of them.
 #[derive(Deserialize)]
 pub struct WeekQuery {
-    pub l: String,
-    pub s: u64,
-    pub r: u32,
+    pub l: Option<String>,
+    pub s: Option<u64>,
+    pub r: Option<u32>,
 }
