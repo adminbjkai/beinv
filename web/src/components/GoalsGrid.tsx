@@ -4,7 +4,7 @@ import type { GoalGroup, GoalRow } from '../goals'
 type Props = {
   groups: GoalGroup[]
   label?: (m: Match) => string | undefined
-  onPlay: (m: Match, e: Event) => void
+  onPlay: (e: Event) => void
   onPlayAll: () => void
   /** week label of the first playlist item (§2b button text) */
   firstWeek: string
@@ -19,7 +19,7 @@ export default function GoalsGrid({ groups, label, onPlay, onPlayAll, firstWeek 
       <div className="flex items-center gap-3">
         <span className="text-sm text-white/60">{total} goals · {groups.length} matches</span>
         <button onClick={onPlayAll} className="ml-auto rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-black transition hover:brightness-110">
-          ▶ Play all · {total} goals · from {firstWeek}
+          ▶ Play all · {total} {total === 1 ? 'goal' : 'goals'} · from {firstWeek}
         </button>
       </div>
       {groups.map(({ m, rows }, gi) => (
@@ -31,7 +31,7 @@ export default function GoalsGrid({ groups, label, onPlay, onPlayAll, firstWeek 
             <img src={m.away.logo} alt="" className="h-5 w-5 object-contain" />
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {rows.map(r => <GoalCard key={r.event.id} m={m} r={r} onPlay={() => onPlay(m, r.event)} />)}
+            {rows.map(r => <GoalCard key={r.event.id} m={m} r={r} onPlay={() => onPlay(r.event)} />)}
           </div>
         </section>
       ))}

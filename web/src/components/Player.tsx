@@ -50,12 +50,13 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
 
   const toggle = useCallback(() => {
     const el = v.current; if (!el) return
-    el.paused ? el.play() : el.pause()
+    if (el.paused) el.play().catch(() => {}); else el.pause()
   }, [])
   const seekBy = useCallback((d: number) => { const el = v.current; if (el) el.currentTime = Math.max(0, Math.min(el.duration || 0, el.currentTime + d)) }, [])
   const fullscreen = useCallback(() => {
     const el = wrap.current; if (!el) return
-    document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen()
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    else el.requestFullscreen().catch(() => {})
   }, [])
   const pip = useCallback(() => { const el = v.current; if (el && 'requestPictureInPicture' in el) el.requestPictureInPicture().catch(() => {}) }, [])
   const step = useCallback((d: number) => {

@@ -86,7 +86,10 @@ final class HighlightsUITests: XCTestCase {
         Thread.sleep(forTimeInterval: 3)   // let the first clip start rendering (transport bar shows the week-labelled title)
         let shot = XCUIScreen.main.screenshot()
         let att = XCTAttachment(screenshot: shot); att.lifetime = .keepAlways; add(att)
-        let out = URL(fileURLWithPath: "/Users/m17/2026/beinv/tv/build/v23-player.png")
+        // Derived from this file's own location so it works in any checkout: .../tv/build/.
+        let out = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("build/v23-player.png")
         try? FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? shot.pngRepresentation.write(to: out)
 

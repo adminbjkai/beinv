@@ -4,7 +4,7 @@ Small native Android app (Kotlin, Jetpack Compose, Media3 ExoPlayer) that lists 
 match highlights from beinsports.com.tr (Süper Lig and Premier League) and plays them.
 Self-contained: it calls the public beIN endpoints directly, no backend.
 
-## Features (v2.3 spec, `docs/FEATURES.md`)
+## Features (v2.5 spec, `docs/FEATURES.md`)
 
 - Layout per §0 parity rules, top to bottom: **League** (`Trendyol Süper Lig` | `İngiltere Premier Lig`) →
   **Season** (always visible; changing it resets the week to that season's default) → **Week** (‹ ›, hidden in
@@ -34,19 +34,22 @@ Self-contained: it calls the public beIN endpoints directly, no backend.
 ## Build
 
 ```
-export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+# JAVA_HOME must be a JDK 17+. Android Studio ships one, e.g. on macOS:
+#   export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+# on Linux: export JAVA_HOME="$HOME/android-studio/jbr"
 cd android
 ./gradlew assembleDebug --no-daemon -q
 ```
 
-`local.properties` must point at the SDK (`sdk.dir=/Users/m17/Library/Android/sdk`).
+`local.properties` must point at your SDK, e.g. `sdk.dir=$HOME/Library/Android/sdk` (macOS) or
+`sdk.dir=$HOME/Android/Sdk` (Linux). The file is git-ignored, so a fresh clone has to create it.
 
 APK: `app/build/outputs/apk/debug/app-debug.apk`
 
 ## Run on the emulator
 
 ```
-~/Library/Android/sdk/emulator/emulator -avd Pixel_9 -dns-server 8.8.8.8,1.1.1.1 &
+$ANDROID_SDK_ROOT/emulator/emulator -avd Pixel_9 -dns-server 8.8.8.8,1.1.1.1 &
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n ai.bjk.highlights/.MainActivity
 ```

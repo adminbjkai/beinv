@@ -1,0 +1,20 @@
+# Keep the build context to what the image actually needs: server/ and web/ sources.
+# Without this, `COPY web/ ./` would overwrite the container's `npm ci` node_modules with
+# the host's platform-specific binaries (vite/rollup/esbuild) and break the web build.
+**/node_modules
+**/dist
+**/target
+**/build
+
+# Native clients — not part of the server image.
+android/
+tv/
+
+.git
+.gitignore
+.github
+docs/
+*.md
+Dockerfile
+docker-compose.yml
+.DS_Store

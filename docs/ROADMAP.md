@@ -24,6 +24,11 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
 ## v2.4 — polish ✅
 - Bug sweep (tvOS Clips-tab jump, restore/reset edge cases, visual consistency) on all clients.
 
+## v2.5 — review sweep ✅
+- Whole-repo audit: correctness fixes on all three clients, cross-client parity of wording and
+  ordering, dead code / unused dependencies removed, Docker packaging documented and hardened,
+  docs re-checked line by line against the code ([reports/review-v2.5.md](reports/review-v2.5.md)).
+
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.
 - Search (team / player name in event descriptions).

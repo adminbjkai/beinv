@@ -121,14 +121,14 @@ data class GoalRow(
  * Applied to exactly the visible rows; tapping a single row opens this same list positioned at that row.
  */
 fun orderedPlaylist(rows: List<GoalRow>): List<GoalRow> = rows.sortedWith(
-    compareBy({ it.round }, { it.match.matchDate ?: "" }, { it.event.minute ?: Int.MAX_VALUE })
+    compareBy({ it.round }, { it.match.matchDate ?: "" }, { it.event.minute ?: 0 })
 )
 
 /** Goal rows (playable ones only) with running score; the score walk includes every goal event. */
 fun Match.goalRows(round: Int = 0, week: String? = null): List<GoalRow> {
     var h = 0; var a = 0
     return matchEvents.orEmpty().filter { it.isGoal }
-        .sortedBy { it.minute ?: Int.MAX_VALUE }
+        .sortedBy { it.minute ?: 0 }
         .map { e ->
             val side = e.side
             when (side) { Side.Home -> h++; Side.Away -> a++; null -> {} }

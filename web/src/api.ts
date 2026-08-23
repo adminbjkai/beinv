@@ -40,7 +40,10 @@ export type ClipMeta = { week?: string; score?: string; logo?: string; title?: s
 export const matchPlaylist = (m: Match, league: string, season: number, meta?: (e: Event) => ClipMeta): PlaylistItem[] => {
   const c = { league, season, round: m.round }
   const items: PlaylistItem[] = []
-  if (m.has_highlight) items.push({ key: `m${m.id}`, src: videoUrl('m', m.id, c), poster: m.thumb, title: m.title, match: m, week: meta?.(m.events[0])?.week })
+  // `meta` is keyed by event, so the highlight borrows the first event's week label.
+  // Premier League matches arrive with `matchEvents: null` (UPSTREAM_API.md §B) — no events, no label.
+  const first: Event | undefined = m.events[0]
+  if (m.has_highlight) items.push({ key: `m${m.id}`, src: videoUrl('m', m.id, c), poster: m.thumb, title: m.title, match: m, week: first && meta?.(first)?.week })
   for (const e of m.events) if (e.has_video) items.push(clipItem(m, e, c, meta?.(e)))
   return items
 }

@@ -1,4 +1,4 @@
-# Feature spec (v2.3) — applies to all clients
+# Feature spec (v2.5) — applies to all clients
 
 All three clients (web, Android, Apple TV) implement the same feature set with platform-native UI. Data comes only from the endpoints in [UPSTREAM_API.md](UPSTREAM_API.md).
 
@@ -34,13 +34,14 @@ Design goal: the playlist reads like the season in order, the user always knows 
 
 - **Order**: week ascending → kick-off time ascending → goal minute ascending. Scope = exactly the visible goals (mode + team + `Only <Team> goals`). Selecting a single goal opens the same ordered list positioned at it.
 - **Every item is labelled with its week**. Canonical item title (identical on all clients): `3. Hafta · Beşiktaş 2–1 Trabzonspor · 55' Jota Silva`. The player shows it as the current title plus `x of N`.
-- **Up next / Previous**: the player chrome shows the next item's title ("Up next: 4. Hafta · 12' …") and the previous one, so next/prev are never blind. On tvOS the same text goes into the item's `externalMetadata` subtitle and the info panel.
+- **Up next / Previous**: the player chrome shows the next item's title ("Up next: 4. Hafta · 12' …"), and on web/Android the previous one too, so next/prev are never blind. On tvOS the "Up next" text (or `Last clip`) goes into the item's `externalMetadata` subtitle and the info panel — the native transport bar already shows what came before.
 - **Autoplay**: next item starts automatically; after the last item the player closes back to the list. Next/prev always available (web buttons + `n`/`p`; Android transport controls; tvOS Siri Remote skip + transport-bar items).
 - **Clip list placement (never covers the video)**:
   - Phone portrait (Android): the ordered list sits **below** the player — grouped by week headers, current row highlighted and auto-scrolled, tap to jump. No overlay, no hamburger.
   - Landscape phone / desktop web: a **side drawer** on the right, ≤ 35 % of the width, translucent (glass), toggled by a "Clips" button (`c` on web); video keeps playing and stays visible; tap outside / Esc / Back closes it.
   - tvOS: the **native swipe-down info panel** (`customInfoViewControllers`) hosts the "Clips" tab: list grouped by week, current highlighted, select to jump. No custom full-screen overlay.
-- **Play all button** reads `Play all · N goals · from 1. Hafta` (first week in the list) so the order is obvious before pressing.
+- **Play all button** reads `Play all · N goals · from 1. Hafta` (first week in the list) so the order is obvious before pressing; `N goal` when there is exactly one.
+- Goals with no minute reported upstream sort as minute 0 (first) on every client.
 
 ## 3. Player
 - Plays the highest-quality (only) rendition: `highlightVideoUrl` / event `sourceVideoUrl`.

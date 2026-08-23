@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.5 — 2026-08-23
+- Repo-wide review sweep. Fixes: web crashed opening any match with no events (every Premier League match); web used the *first* week as the default instead of the last (FEATURES §1); Android re-selecting a played clip seeked to its last frame (and closed the player on the final clip); Android leaving fullscreen hard-locked portrait for the rest of the session; tvOS fell back to the *oldest* season and could cache an empty "By team" season permanently.
+- Parity: identical goal-count pluralisation and "Full highlight" wording on all clients; minute-less goals now sort the same way everywhere.
+- Tidy: dead code and unused deps/imports removed, Docker files documented and hardened, template favicon replaced. Details in [reports/review-v2.5.md](reports/review-v2.5.md).
+
 ## v2.4 — 2026-08-22
 - Bug-fix & polish sweep on all clients. tvOS: selecting a clip from the info-panel Clips tab now jumps (was a no-op on device). Details per client in docs/reports/*-v2.4.md.
 

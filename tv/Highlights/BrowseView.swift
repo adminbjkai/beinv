@@ -61,7 +61,8 @@ final class BrowseModel: ObservableObject {
         do {
             seasons = try await API.shared.seasons(for: league).filter { $0.id != nil }
             let saved = prefs.object(forKey: "season") as? Int
-            seasonId = (seasons.first { $0.id == saved } ?? seasons.first { $0.isCurrent == true } ?? seasons.last)?.id
+            // Seasons come back newest-first, so the fallback is `.first` — matching web and Android.
+            seasonId = (seasons.first { $0.id == saved } ?? seasons.first { $0.isCurrent == true } ?? seasons.first)?.id
         } catch {
             self.error = error.localizedDescription; loading = false
         }
@@ -96,6 +97,9 @@ final class BrowseModel: ObservableObject {
     func loadSeason() async {
         guard let sid = seasonId, seasonMatches.isEmpty, seasonProgress == nil else { return }
         let rounds = weeks.compactMap(\.round)
+        // The season's weeks may not have arrived yet. Fetching with no rounds would cache an empty
+        // season for the rest of the run, leaving "By team" permanently empty.
+        guard !rounds.isEmpty else { return }
         seasonProgress = (0, rounds.count); error = nil
         do {
             let all = try await API.shared.seasonMatches(league: league, seasonId: sid, rounds: rounds) { done, total in
@@ -250,7 +254,7 @@ struct BrowseView: View {
             if model.showingGoals {
                 let goals = model.goalClips
                 let from = goals.first?.week.map { " · from \($0)" } ?? ""
-                Button { playback = Playback(clips: goals) } label: { Label("Play all · \(goals.count) goals\(from)", systemImage: "play.fill") }
+                Button { playback = Playback(clips: goals) } label: { Label("Play all · \(goals.count) \(goals.count == 1 ? "goal" : "goals")\(from)", systemImage: "play.fill") }
                     .disabled(goals.isEmpty)
                     .accessibilityIdentifier("goals.playall")
             }

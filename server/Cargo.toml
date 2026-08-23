@@ -1,6 +1,6 @@
 [package]
 name = "beinv-server"
-version = "0.1.0"
+version = "2.5.0"
 edition = "2021"
 
 [dependencies]
@@ -10,7 +10,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "str
 moka = { version = "0.12", features = ["future"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1"
-tower-http = { version = "0.6", features = ["fs", "cors", "trace"] }
+tower-http = { version = "0.6", features = ["fs"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"

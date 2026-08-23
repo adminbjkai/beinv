@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.List
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
@@ -71,14 +68,22 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
     // --- fullscreen: manual toggle OR device rotated to landscape ---
     val deviceLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var fsRequested by remember { mutableStateOf(false) }
-    val fullscreen = (fsRequested || deviceLandscape) && !inPip
+    // Set when the user leaves fullscreen while the device is still landscape, so we stay windowed
+    // instead of immediately re-entering. Rotating back to portrait re-arms auto-fullscreen.
+    var fsDismissed by remember { mutableStateOf(false) }
+    val fullscreen = (fsRequested || (deviceLandscape && !fsDismissed)) && !inPip
+    LaunchedEffect(deviceLandscape) { if (!deviceLandscape) fsDismissed = false }
     fun enterFullscreen() {
         fsRequested = true
+        fsDismissed = false
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
     fun exitFullscreen() {
         fsRequested = false
-        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        fsDismissed = deviceLandscape
+        // Hand orientation back to the sensor. Forcing PORTRAIT here would hard-lock the activity,
+        // so the user could not rotate into landscape again for the rest of the player session.
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
     BackHandler(enabled = fullscreen) { exitFullscreen() }
 
@@ -102,7 +107,12 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
                 if (i in clips.indices) current = i
             }
             override fun onPositionDiscontinuity(old: Player.PositionInfo, new: Player.PositionInfo, reason: Int) {
-                if (old.mediaItemIndex != new.mediaItemIndex) positions[old.mediaItemIndex] = old.positionMs
+                // Only remember a genuine mid-clip position. On an auto-transition `old.positionMs`
+                // is the clip's end, so storing it would make re-selecting that clip seek to its last
+                // frame — it would end instantly and skip on (or close the player, on the last clip).
+                if (old.mediaItemIndex != new.mediaItemIndex && reason != Player.DISCONTINUITY_REASON_AUTO_TRANSITION) {
+                    positions[old.mediaItemIndex] = old.positionMs
+                }
             }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_ENDED) { // last clip ended (no loop): back to the list
@@ -154,7 +164,7 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
     val upNext = clips.getOrNull(current + 1)?.title
     val previous = clips.getOrNull(current - 1)?.title
 
-    Column(Modifier.fillMaxSize().background(if (fullscreen || inPip) androidx.compose.ui.graphics.Color.Black else Background)
+    Column(Modifier.fillMaxSize().background(if (fullscreen || inPip) Color.Black else Background)
         .then(if (fullscreen || inPip) Modifier else Modifier.statusBarsPadding())) {
         if (!fullscreen && !inPip) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {

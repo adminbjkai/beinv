@@ -6,7 +6,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
-    response::{IntoResponse, Json, Response},
+    response::{Json, Response},
     routing::get,
     Router,
 };
@@ -174,7 +174,9 @@ async fn main() {
     };
 
     let dist = std::env::var("WEB_DIST").unwrap_or_else(|_| "../web/dist".into());
-    let spa = ServeDir::new(&dist).not_found_service(ServeFile::new(format!("{dist}/index.html")));
+    // `fallback`, not `not_found_service`: the latter forces the response to 404, so a
+    // client-side route would return the SPA with a 404 status.
+    let spa = ServeDir::new(&dist).fallback(ServeFile::new(format!("{dist}/index.html")));
 
     let router = Router::new()
         .route("/api/leagues", get(leagues))
@@ -189,9 +191,4 @@ async fn main() {
     tracing::info!("listening on http://{addr}");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, router).await.unwrap();
-}
-
-#[allow(dead_code)]
-fn _assert_into_response(r: Response) -> Response {
-    r.into_response()
 }

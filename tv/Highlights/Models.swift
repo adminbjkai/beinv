@@ -159,7 +159,7 @@ struct Match: Codable, Hashable, Identifiable {
     /// Full highlight followed by every clip — the player's playlist.
     var playlist: [Clip] {
         var list: [Clip] = []
-        if let u = videoURL { list.append(Clip(id: "m\(id)", title: "Full highlights", subtitle: title, url: u, isFull: true)) }
+        if let u = videoURL { list.append(Clip(id: "m\(id)", title: "Full highlight", subtitle: title, url: u, isFull: true)) }
         list += events.map { Clip(event: $0, match: self) }
         return list
     }

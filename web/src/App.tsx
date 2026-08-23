@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { api, clipItem, matchPlaylist, type Match, type Event, type PlaylistItem } from './api'
+import { api, clipItem, matchPlaylist, type Match, type Event, type Season, type PlaylistItem } from './api'
 import MatchCard from './components/MatchCard'
 import GoalsGrid from './components/GoalsGrid'
 import { goalGroups, playlistOrder, clipTitle, scoreAt } from './goals'
@@ -13,6 +13,8 @@ type Stored = { l?: string; s?: number; r?: number; mode?: Mode; t?: string; g?:
 const LS = 'beinv.v2'
 const stored = (): Stored => { try { return JSON.parse(localStorage.getItem(LS) ?? '{}') } catch { return {} } }
 const isMode = (x: unknown): x is Mode => MODES.some(([m]) => m === x)
+/** FEATURES §1: default week is `currentWeekForFixture`, else the *last* week (as on tvOS/Android). */
+const defaultWeek = (s?: Season) => s?.weeks.find(w => w.is_current) ?? s?.weeks.at(-1)
 
 /** playlist + cursor; `matchId` set when it belongs to a single match (drives the clip chips + `?m=`) */
 type Playing = { items: PlaylistItem[]; index: number; matchId?: number }
@@ -50,8 +52,7 @@ export default function App() {
     const s = known ?? seasons.data?.find(x => x.is_current) ?? seasons.data?.[0]
     if (!s) return
     setSeasonId(s.id)
-    const w = s.weeks.find(x => x.is_current) ?? s.weeks[0]
-    setRound(w?.round)
+    setRound(defaultWeek(s)?.round)
   }, [seasons.data])
 
   const season = seasons.data?.find(s => s.id === seasonId)
@@ -100,7 +101,7 @@ export default function App() {
   const ordered = useMemo(() => playlistOrder(groups), [groups])
   const allGoals = () => ordered.flatMap(g => g.rows.map(r => clipItem(g.m, r.event, { league, season: seasonId!, round: g.m.round }, clipMeta(g.m)(r.event))))
   const playAll = () => { const items = allGoals(); if (items.length) { setPlaying({ items, index: 0 }); window.scrollTo({ top: 0, behavior: 'smooth' }) } }
-  const playGoal = (_m: Match, e: Event) => {
+  const playGoal = (e: Event) => {
     const items = allGoals(); const index = Math.max(0, items.findIndex(i => i.event?.id === e.id))
     setPlaying({ items, index }); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -158,7 +159,7 @@ export default function App() {
         </div>
         <label className="glass flex items-center rounded-xl pl-3 text-sm"><span className="mr-2 text-white/50">Season</span>
         <select value={seasonId ?? ''} aria-label="Season"
-          onChange={e => { const s = seasons.data?.find(x => x.id === +e.target.value); setSeasonId(s?.id); setRound((s?.weeks.find(w => w.is_current) ?? s?.weeks[0])?.round) }}
+          onChange={e => { const s = seasons.data?.find(x => x.id === +e.target.value); setSeasonId(s?.id); setRound(defaultWeek(s)?.round) }}
           className="bg-transparent py-2 text-sm font-medium outline-none">
           {(seasons.data ?? []).map(s => <option key={s.id} value={s.id} className="bg-panel">{s.name}</option>)}
         </select></label>

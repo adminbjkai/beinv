@@ -1,0 +1,15 @@
+services:
+  beinv:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: beinv
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8084:8080"
+    environment:
+      - BIND=0.0.0.0:8080
+      - WEB_DIST=/app/web/dist
+      - RUST_LOG=info
+    # No volumes: the server is stateless — every cache (seasons, weeks, season
+    # matches, video sources) lives in memory and is rebuilt from upstream on start.
