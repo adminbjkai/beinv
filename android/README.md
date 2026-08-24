@@ -1,12 +1,12 @@
 # Highlights (Android)
 
 Small native Android app (Kotlin, Jetpack Compose, Media3 ExoPlayer) that lists football
-match highlights from beinsports.com.tr (Süper Lig and Premier League) and plays them.
-Self-contained: it calls the public beIN endpoints directly, no backend.
+match highlights from beinsports.com.tr (Süper Lig, Premier League, İspanya La Liga) and plays them.
+Self-contained: it calls the public beIN endpoints directly, no backend. İspanya La Liga seasons load; weeks stay empty here because beIN has no highlight mp4s (web remuxes them — [UPSTREAM_API.md](../docs/UPSTREAM_API.md) §D).
 
 ## Features (v2.6 spec, `docs/FEATURES.md`)
 
-- Layout per §0 parity rules, top to bottom: **League** (`Trendyol Süper Lig` | `İngiltere Premier Lig`) →
+- Layout per §0 parity rules, top to bottom: **League** (`Trendyol Süper Lig` | `İngiltere Premier Lig` | `İspanya La Liga`) →
   **Season** (always visible; changing it resets the week to that season's default) → **Week** (‹ ›, hidden in
   By team) → **Mode** (`Highlights` | `Goals` | `By team`) → mode row → content. League, season/week (per league),
   mode, team (per league), the `Matches` | `Goals` sub-switch and the `Only <Team> goals` toggle are remembered in

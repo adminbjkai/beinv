@@ -7,6 +7,7 @@ struct League: Identifiable, Hashable {
     static let all: [League] = [
         League(id: "super-lig", name: "Trendyol Süper Lig", orgId: 18),
         League(id: "ingiltere-premier-ligi", name: "İngiltere Premier Lig", orgId: 17),
+        League(id: "ispanya-la-liga", name: "İspanya La Liga", orgId: 60),
     ]
 }
 

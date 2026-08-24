@@ -29,7 +29,8 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
   ordering, dead code / unused dependencies removed, Docker packaging documented and hardened,
   docs re-checked line by line against the code ([reports/review-v2.5.md](reports/review-v2.5.md)).
 
-## v2.6 — polish & runtime validation ✅
+## v2.6 — La Liga + polish ✅
+- Third league `İspanya La Liga`. Web: 2026/2027 highlights via LaLiga public fixtures + official LALIGA remux (`yt-dlp`/`ffmpeg`, typically 1080p50 + stereo AAC) through `/video`. Native clients expose the league; weeks stay empty until beIN publishes mp4s.
 - Every client built and run (emulator / simulator / headless Chrome / live server) rather than only
   read; upstream contract re-measured. Correctness and a11y fixes on web, resilience fixes on the
   server, a visible metadata bug and hot-path allocations on Android, warnings to zero on Android and
@@ -38,6 +39,7 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.
 - Search (team / player name in event descriptions).
+- Point Android/tvOS La Liga playback at the web remux proxy (or wait for beIN mp4s).
 - Other beIN leagues (1. Lig, Ligue 1/2, Portugal, Basketball) — same endpoints, different `orgId` ([UPSTREAM_API.md](UPSTREAM_API.md) lists them).
 - Top Shelf (tvOS) / home-screen widget (Android) with latest goals.
 - Offline cache of the last fetched week.

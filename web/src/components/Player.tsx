@@ -33,6 +33,7 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   const [show, setShow] = useState(true)
   const [waiting, setWaiting] = useState(false)
   const [clips, setClips] = useState(initialClips)
+  const [err, setErr] = useState(false)
   const drawer = useRef<HTMLElement>(null)
   const clipsBtn = useRef<HTMLButtonElement>(null)
   const clipsRef = useRef(clips)
@@ -102,7 +103,7 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
 
   // new item → reset display state and start playback
   useEffect(() => {
-    setTime(0); setDur(0); setBuffered(0); poke()
+    setTime(0); setDur(0); setBuffered(0); setErr(false); poke()
     const el = v.current
     if (el) el.play().catch(() => {})
   }, [item.key, poke])
@@ -153,15 +154,29 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
     <div ref={wrap} onMouseMove={poke} onMouseLeave={() => playing && !clips && setShow(false)}
       className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-[0_30px_80px_-20px_rgba(0,0,0,.8)] select-none">
       <video ref={v} src={item.src} poster={item.poster} autoPlay playsInline preload="metadata"
-        onClick={toggle} onDoubleClick={fullscreen} className="h-full w-full" />
+        onClick={toggle} onDoubleClick={fullscreen} onError={() => setErr(true)}
+        className="h-full w-full bg-black object-contain" />
 
-      {waiting && (
+      {waiting && !err && (
         <div className="pointer-events-none absolute inset-0 grid place-items-center">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-accent" />
         </div>
       )}
 
-      {!playing && !waiting && (
+      {err && (
+        <div className="absolute inset-0 z-[1] grid place-items-center bg-black/75 p-6 text-center">
+          <div>
+            <p className="mb-3 text-sm text-white/80">Could not play this highlight.</p>
+            <button
+              onClick={() => { setErr(false); const el = v.current; if (el) { el.load(); el.play().catch(() => {}) } }}
+              className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!playing && !waiting && !err && (
         <button onClick={toggle} aria-label="Play"
           className="absolute inset-0 grid place-items-center bg-black/20 transition hover:bg-black/30">
           <span className="grid h-20 w-20 place-items-center rounded-full bg-white/90 text-black shadow-2xl transition group-hover:scale-105">

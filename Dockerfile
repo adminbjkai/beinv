@@ -19,10 +19,16 @@ RUN cargo build --release
 
 # Stage 3: Runtime image
 FROM debian:bookworm-slim
-# ca-certificates: rustls needs a trust store to reach beIN / Akamai over TLS.
+# ca-certificates: rustls needs a trust store to reach beIN / Akamai / YouTube over TLS.
 # curl: used by the healthcheck below.
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl && rm -rf /var/lib/apt/lists/* \
- && useradd --system --uid 10001 --no-create-home beinv
+# ffmpeg + python3 + yt-dlp (latest release): remux La Liga highlights to same-origin
+# H.264+AAC MP4 (1080p50 when the source has it). yt-dlp ≥ 2026.08.19 is required for HQ.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg python3 \
+ && curl -fsSL -o /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+ && chmod a+rx /usr/local/bin/yt-dlp \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --system --uid 10001 --no-create-home beinv \
+ && mkdir -p /tmp/beinv-yt && chown 10001:10001 /tmp/beinv-yt
 WORKDIR /app
 
 COPY --from=server-builder /app/server/target/release/beinv-server /app/beinv-server

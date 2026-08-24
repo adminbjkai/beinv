@@ -39,5 +39,6 @@ test('clipItem falls back to the match thumbnail, and scoreline renders a missin
   const e = { ...ev(11, 25), thumb: '' }
   assert.equal(clipItem(base, e, { league: 'super-lig', season: 3974, round: 3 }).poster, 'm.jpg')
   assert.equal(videoUrl('e', 11, { league: 'super-lig', season: 3974, round: 3 }), '/video/e/11?l=super-lig&s=3974&r=3')
+  assert.equal(videoUrl('m', 102249, { league: 'ispanya-la-liga', season: 3968, round: 1 }), '/video/m/102249?l=ispanya-la-liga&s=3968&r=1')
   assert.equal(scoreline({ ...base, away: { ...base.away, score: null } }), 'Beşiktaş 1-– Eyüpspor')
 })

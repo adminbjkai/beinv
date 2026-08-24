@@ -7,6 +7,7 @@ data class League(val id: String, val orgId: Int, val name: String)
 val LEAGUES = listOf(
     League("super-lig", 18, "Trendyol Süper Lig"),
     League("ingiltere-premier-ligi", 17, "İngiltere Premier Lig"),
+    League("ispanya-la-liga", 60, "İspanya La Liga"),
 )
 
 enum class Mode(val label: String) { Highlights("Highlights"), Goals("Goals"), ByTeam("By team") }

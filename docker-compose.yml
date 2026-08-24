@@ -11,5 +11,6 @@ services:
       - BIND=0.0.0.0:8080
       - WEB_DIST=/app/web/dist
       - RUST_LOG=info
-    # No volumes: the server is stateless — every cache (seasons, weeks, season
-    # matches, video sources) lives in memory and is rebuilt from upstream on start.
+      - BEINV_VIDEO_CACHE=/tmp/beinv-yt
+    # No volumes: API caches live in memory and rebuild from upstream on start.
+    # Remuxed La Liga mp4s sit in BEINV_VIDEO_CACHE (tmpfs, lost on recreate).

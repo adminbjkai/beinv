@@ -1,7 +1,9 @@
 # Changelog
 
-## v2.6 — 2026-08-23
-- Polish/optimisation sweep, this time with every client **built and run** and the upstream contract
+## v2.6 — 2026-08-24
+- **İspanya La Liga** added to the league switch (all clients). Web 2026/2027 weeks list official match highlights (LaLiga fixtures + LALIGA channel). The server remuxes the highest H.264 + AAC the source publishes (typically **1080p50 + stereo AAC**; vertical clips max ~608×1080) to a same-origin MP4 with `+faststart`, so the in-app player is never a YouTube embed. Falls back to 360p only if the HQ fetch fails. Goals mode is empty by data, same as Premier League. Android/tvOS list the league (seasons from beIN) and show the existing empty-week state because beIN has no La Liga mp4s.
+- Web: league chips scroll on a narrow phone; player `object-contain` + Retry overlay; Help & shortcuts at the bottom.
+- Polish/optimisation sweep, with every client **built and run** and the upstream contract
   re-verified live. Fixes: web's "Clips" button moved out from under the cursor mid-click so its own
   click never fired; web swallowed Space/Enter on focused buttons while the player was open;
   switching league re-queried with the previous league's season; one failing week blanked a whole
@@ -15,7 +17,7 @@
   stopped scanning it with deep-equality `indexOf`; tvOS stopped allocating an `ISO8601DateFormatter`
   inside season-wide sort comparators.
 - Parity: an unreported score is an en dash on all three clients (was `–` / `-` / `0`).
-- Details, including what was *not* verified, in [reports/review-v2.6.md](reports/review-v2.6.md).
+- Details of the polish pass, including what was *not* verified, in [reports/review-v2.6.md](reports/review-v2.6.md).
 
 ## v2.5 — 2026-08-23
 - Repo-wide review sweep. Fixes: web crashed opening any match with no events (every Premier League match); web used the *first* week as the default instead of the last (FEATURES §1); Android re-selecting a played clip seeked to its last frame (and closed the player on the final clip); Android leaving fullscreen hard-locked portrait for the rest of the session; tvOS fell back to the *oldest* season and could cache an empty "By team" season permanently.

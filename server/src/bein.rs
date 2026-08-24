@@ -14,6 +14,7 @@ pub struct League {
 pub const LEAGUES: &[League] = &[
     League { id: "super-lig", name: "Trendyol Süper Lig", org_id: 18, sport_id: 1 },
     League { id: "ingiltere-premier-ligi", name: "İngiltere Premier Lig", org_id: 17, sport_id: 1 },
+    League { id: "ispanya-la-liga", name: "İspanya La Liga", org_id: 60, sport_id: 1 },
 ];
 
 pub fn league(id: &str) -> Option<League> {
@@ -148,6 +149,11 @@ pub async fn fetch_week(client: &reqwest::Client, lg: League, season: u64, round
         })
         .collect();
     out.sort_by(|a, b| a.date.cmp(&b.date));
+    // beIN lists İspanya La Liga seasons/weeks but never publishes highlight mp4s
+    // (`{"Data":{}}` for 2024–2027). Overlay official 2026/2027 highlights instead.
+    if out.is_empty() && lg.id == "ispanya-la-liga" {
+        return crate::laliga::fetch_week(client, season, round).await;
+    }
     Ok(out)
 }
 

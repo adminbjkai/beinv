@@ -149,10 +149,11 @@ export default function App() {
         <h1 className="mr-auto text-2xl font-extrabold tracking-tight">
           <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">Highlights</span>
         </h1>
-        <div className="glass flex flex-wrap rounded-xl p-1">
+        <div className="glass flex w-full max-w-full overflow-x-auto rounded-xl p-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] sm:w-auto [&::-webkit-scrollbar]:hidden">
           {(leagues.data ?? []).map(l => (
             <button key={l.id} onClick={() => { setLeague(l.id); setTeam(undefined); setSeasonId(undefined); setRound(undefined) }}
-              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition ${league === l.id ? 'bg-white text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}>
+              aria-pressed={league === l.id} aria-label={l.name}
+              className={`min-h-11 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${league === l.id ? 'bg-white text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}>
               {l.name}
             </button>
           ))}
@@ -236,8 +237,9 @@ export default function App() {
         </div>
       )}
       {list.data && !goalsView && matches.length === 0 && (
-        <div className="glass fade-up rounded-2xl p-12 text-center text-white/60">
+        <div className="glass fade-up rounded-2xl p-8 text-center text-white/60 sm:p-12">
           {teamMode ? 'No highlights published for this team yet.' : 'No highlights published for this week yet.'}
+          <p className="mt-2 text-sm text-white/40">They usually appear a few hours after kick-off. If loading fails, tap Retry.</p>
         </div>
       )}
       {list.data && goalsView && (
@@ -249,6 +251,15 @@ export default function App() {
           {matches.map((m, i) => <MatchCard key={m.id} m={m} i={i} label={teamMode ? weekName(m) : undefined} onOpen={() => openMatch(m)} />)}
         </div>
       )}
+
+      <details className="mt-16 text-xs text-white/40">
+        <summary className="cursor-pointer select-none py-2 text-white/50">Help &amp; shortcuts</summary>
+        <div className="mt-2 max-w-xl space-y-2 leading-relaxed">
+          <p>Pick a league, season and week, then tap a match. The highlight plays on this page (same player on phones and desktop) — use fullscreen, skip, mute and PiP from the bar under the video.</p>
+          <p><b className="text-white/60">İspanya La Liga</b> starts with the 2026/2027 season. Full-match highlights appear after each game; Goals mode stays empty until individual goal clips are published (same as Premier League).</p>
+          <p>Keyboard: space / k play · ← → seek 10s · n / p next/prev · f fullscreen · m mute · c clips list · Esc close.</p>
+        </div>
+      </details>
     </div>
   )
 }

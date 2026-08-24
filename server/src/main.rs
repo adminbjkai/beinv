@@ -1,5 +1,7 @@
 mod bein;
+mod laliga;
 mod video;
+mod youtube;
 
 use std::{collections::HashSet, sync::Arc, time::Duration};
 
