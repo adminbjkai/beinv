@@ -44,5 +44,6 @@ test('clipItem falls back to the match thumbnail, and scoreline renders a missin
   assert.equal(videoUrl('e', 11, { league: 'super-lig', season: 3974, round: 3 }), '/video/e/11?l=super-lig&s=3974&r=3')
   assert.equal(videoUrl('m', 102249, { league: 'ispanya-la-liga', season: 3968, round: 1 }), '/video/m/102249?l=ispanya-la-liga&s=3968&r=1')
   assert.equal(videoUrl('m', 1515722, { league: 'super-lig', season: 3974, round: 2, hd: true }), '/video/m/1515722?l=super-lig&s=3974&r=2&q=hd')
+  assert.equal(videoUrl('m', 1510542, { league: 'ingiltere-premier-ligi', season: 3958, round: 1, hd: true }), '/video/m/1510542?l=ingiltere-premier-ligi&s=3958&r=1&q=hd')
   assert.equal(scoreline({ ...base, away: { ...base.away, score: null } }), 'Beşiktaş 1-– Eyüpspor')
 })

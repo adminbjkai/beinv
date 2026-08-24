@@ -10,6 +10,25 @@ val LEAGUES = listOf(
     League("ispanya-la-liga", 60, "İspanya La Liga"),
 )
 
+/** Public remux host — HD YouTube cuts and La Liga highlights are served from here. */
+const val BEINV = "https://beinv.bjk.ai"
+
+fun League.usesHdToggle() = id == "super-lig" || id == "ingiltere-premier-ligi"
+fun League.isLaLiga() = id == "ispanya-la-liga"
+
+fun hdVideoUrl(league: League, seasonId: Int, round: Int, matchId: Long): String =
+    "$BEINV/video/m/$matchId?l=${league.id}&s=$seasonId&r=$round&q=hd"
+
+/** Swap the full-highlight URL onto the remux proxy when HD is on (or for La Liga). Goal clips stay on beIN. */
+fun Match.playable(league: League, seasonId: Int, round: Int, hd: Boolean): Match {
+    val id = matchId ?: return this
+    return when {
+        league.isLaLiga() -> copy(highlightVideoUrl = hdVideoUrl(league, seasonId, round, id))
+        hd && league.usesHdToggle() -> copy(highlightVideoUrl = hdVideoUrl(league, seasonId, round, id))
+        else -> this
+    }
+}
+
 enum class Mode(val label: String) { Highlights("Highlights"), Goals("Goals"), ByTeam("By team") }
 
 @Serializable
@@ -149,6 +168,32 @@ fun Match.goalRows(round: Int = 0, week: String? = null): List<GoalRow> {
 
 /** A match of a given week (used by the per-season team view). */
 data class WeekMatch(val round: Int, val match: Match)
+
+@Serializable
+data class BeinvTeam(val name: String = "", val logo: String = "", val score: Int? = null)
+
+@Serializable
+data class BeinvMatch(
+    val id: Long,
+    val round: Int = 0,
+    val title: String = "",
+    val date: String = "",
+    val home: BeinvTeam = BeinvTeam(),
+    val away: BeinvTeam = BeinvTeam(),
+    val thumb: String = "",
+    val has_highlight: Boolean = false,
+) {
+    fun toMatch(league: League, seasonId: Int): Match = Match(
+        matchId = id,
+        matchDate = date,
+        highLightTitle = title,
+        highlightThumbnail = thumb,
+        highlightVideoUrl = hdVideoUrl(league, seasonId, round, id),
+        homeTeam = Team(home.name, home.logo, home.score),
+        awayTeam = Team(away.name, away.logo, away.score),
+        matchEvents = emptyList(),
+    )
+}
 
 data class Clip(
     val title: String, val subtitle: String?, val url: String, val goal: Boolean,

@@ -1,7 +1,7 @@
-//! La Liga 2026/2027 highlight overlay.
+//! La Liga highlight overlay (2025/2026 and 2026/2027).
 //!
-//! beIN TR exposes İspanya La Liga seasons/weeks (`ispanya-la-liga`, org 60, season 3968)
-//! but `highlights/events` is empty (`{"Data":{}}`) for every season checked. Fixtures and
+//! beIN TR exposes İspanya La Liga seasons/weeks (`ispanya-la-liga`, org 60) but
+//! `highlights/events` is empty (`{"Data":{}}`) for every season checked. Fixtures and
 //! scores come from LaLiga's public API; full-match highlights come from the official
 //! LALIGA YouTube channel and are remuxed to same-origin MP4 by `youtube.rs`.
 
@@ -18,8 +18,17 @@ use crate::bein::{Match, Team};
 
 /// beIN season id for 2026/2027 (verified live 2026-08-23).
 pub const BEIN_SEASON_2026: u64 = 3968;
-const SUBSCRIPTION: &str = "laliga-easports-2026";
+/// beIN season id for 2025/2026 (verified live 2026-08-24).
+pub const BEIN_SEASON_2025: u64 = 3850;
 const API: &str = "https://apim.laliga.com/public-service/api/v1/matches";
+
+fn slug_for(season: u64) -> Option<&'static str> {
+    match season {
+        BEIN_SEASON_2026 => Some("laliga-easports-2026"),
+        BEIN_SEASON_2025 => Some("laliga-easports-2025"),
+        _ => None,
+    }
+}
 const API_KEY: &str = "c13c3a8e2f6b46da9c5c425cf61fab3e";
 const YT_CHANNEL: &str = "UCTv-XvfzLX3i4IGWAm4sbmA";
 const RSS: &str = "https://www.youtube.com/feeds/videos.xml?channel_id=UCTv-XvfzLX3i4IGWAm4sbmA";
@@ -46,7 +55,7 @@ struct YtIndex {
     videos: Vec<YtVid>,
 }
 
-static SEASON: Mutex<Option<SeasonDump>> = Mutex::const_new(None);
+static SEASON: Mutex<Option<HashMap<String, SeasonDump>>> = Mutex::const_new(None);
 static YT: Mutex<Option<YtIndex>> = Mutex::const_new(None);
 static BY_MATCH: Mutex<Option<HashMap<u64, String>>> = Mutex::const_new(None);
 
@@ -88,12 +97,7 @@ pub fn norm_name(s: &str) -> String {
     }
     let s = out.trim().to_string();
     let mut tokens: Vec<&str> = s.split_whitespace().collect();
-    tokens.retain(|t| {
-        !matches!(
-            *t,
-            "cf" | "fc" | "ud" | "cd" | "sad" | "rc" | "rcd" | "ca" | "r" | "club" | "de"
-        )
-    });
+    tokens.retain(|t| !matches!(*t, "cf" | "fc" | "ud" | "cd" | "sad" | "rc" | "rcd" | "ca" | "r" | "club" | "de"));
     // "espanyol barcelona" → keep espanyol; "real madrid" stays two tokens
     if tokens.len() >= 2 && tokens.last() == Some(&"barcelona") && tokens[tokens.len() - 2] == "espanyol" {
         tokens.pop();
@@ -133,13 +137,42 @@ pub fn parse_clock(s: &str) -> u32 {
     n
 }
 
+/// True when the title carries `HOME_SCORE - AWAY_SCORE` with digit boundaries
+/// (`1-1` must not match `11-1`).
+pub fn score_in_title(title: &str, hs: i64, aws: i64) -> bool {
+    let t: String = title
+        .chars()
+        .map(|c| match c {
+            '–' | '—' | '−' => '-',
+            _ => c,
+        })
+        .filter(|c| !c.is_whitespace())
+        .collect();
+    let needle = format!("{hs}-{aws}");
+    let bytes = t.as_bytes();
+    let n = needle.as_bytes();
+    bytes.windows(n.len()).enumerate().any(|(i, w)| {
+        w == n
+            && (i == 0 || !bytes[i - 1].is_ascii_digit())
+            && (i + n.len() >= bytes.len() || !bytes[i + n.len()].is_ascii_digit())
+    })
+}
+
 /// Longest matching highlight (landscape cuts run ~20–30 s longer than the vertical ones).
+/// When scores are known, prefer a title that carries that score so 2025/26 and 2026/27
+/// meetings of the same two clubs do not collide.
 pub fn pick_best(cands: &[YtVid], home: &str, away: &str) -> Option<String> {
-    cands
-        .iter()
-        .filter(|v| title_matches(&v.title, home, away))
-        .max_by_key(|v| v.secs)
-        .map(|v| v.id.clone())
+    pick_best_scored(cands, home, away, None, None)
+}
+
+pub fn pick_best_scored(cands: &[YtVid], home: &str, away: &str, hs: Option<i64>, aws: Option<i64>) -> Option<String> {
+    let teams: Vec<&YtVid> = cands.iter().filter(|v| title_matches(&v.title, home, away)).collect();
+    let scored: Vec<&YtVid> = match (hs, aws) {
+        (Some(h), Some(a)) => teams.iter().copied().filter(|v| score_in_title(&v.title, h, a)).collect(),
+        _ => Vec::new(),
+    };
+    let pool = if scored.is_empty() { teams } else { scored };
+    pool.into_iter().max_by_key(|v| v.secs).map(|v| v.id.clone())
 }
 
 pub(crate) fn json_text(v: &Value) -> String {
@@ -151,12 +184,7 @@ pub(crate) fn json_text(v: &Value) -> String {
     }
     v.get("runs")
         .and_then(Value::as_array)
-        .map(|rs| {
-            rs.iter()
-                .filter_map(|r| r.get("text").and_then(Value::as_str))
-                .collect::<Vec<_>>()
-                .join("")
-        })
+        .map(|rs| rs.iter().filter_map(|r| r.get("text").and_then(Value::as_str)).collect::<Vec<_>>().join(""))
         .unwrap_or_default()
 }
 
@@ -172,11 +200,7 @@ fn s(v: &Value, k: &str) -> String {
 fn team(v: &Value) -> Team {
     let name = s(v, "nickname");
     let name = if name.is_empty() { s(v, "boundname") } else { name };
-    let logo = v
-        .pointer("/shield/url")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .to_string();
+    let logo = v.pointer("/shield/url").and_then(Value::as_str).unwrap_or("").to_string();
     Team { name, logo, score: None }
 }
 
@@ -186,17 +210,21 @@ fn team_with_score(v: &Value, score: Option<i64>) -> Team {
     t
 }
 
-async fn load_season(client: &reqwest::Client) -> anyhow::Result<Arc<Vec<Value>>> {
-    let mut g = SEASON.lock().await;
-    if let Some(c) = g.as_ref() {
-        if c.loaded.elapsed() < Duration::from_secs(300) {
-            return Ok(c.matches.clone());
+async fn load_season(client: &reqwest::Client, slug: &str) -> anyhow::Result<Arc<Vec<Value>>> {
+    {
+        let g = SEASON.lock().await;
+        if let Some(map) = g.as_ref() {
+            if let Some(c) = map.get(slug) {
+                if c.loaded.elapsed() < Duration::from_secs(300) {
+                    return Ok(c.matches.clone());
+                }
+            }
         }
     }
     let mut all = Vec::new();
     let mut offset = 0u32;
     loop {
-        let url = format!("{API}?subscriptionSlug={SUBSCRIPTION}&limit=100&offset={offset}");
+        let url = format!("{API}?subscriptionSlug={slug}&limit=100&offset={offset}");
         let v: Value = client
             .get(&url)
             .header("Ocp-Apim-Subscription-Key", API_KEY)
@@ -215,9 +243,11 @@ async fn load_season(client: &reqwest::Client) -> anyhow::Result<Arc<Vec<Value>>
             break;
         }
     }
-    tracing::info!("laliga season dump {} matches", all.len());
+    tracing::info!("laliga season dump {slug} {} matches", all.len());
     let arc = Arc::new(all);
-    *g = Some(SeasonDump { loaded: Instant::now(), matches: arc.clone() });
+    let mut g = SEASON.lock().await;
+    let map = g.get_or_insert_with(HashMap::new);
+    map.insert(slug.to_string(), SeasonDump { loaded: Instant::now(), matches: arc.clone() });
     Ok(arc)
 }
 
@@ -306,26 +336,28 @@ async fn load_yt_index(client: &reqwest::Client) -> Vec<YtVid> {
             }
         }
     }
-    // Innertube search — latest official RESUMEN/HIGHLIGHTS with clock in lengthText
-    let body = serde_json::json!({
-        "context": { "client": { "clientName": "WEB", "clientVersion": "2.20260101.00.00", "hl": "en" } },
-        "query": "RESUMEN LALIGA EA SPORTS",
-        "params": "EgIQAQ=="
-    });
-    if let Ok(v) = async {
-        let r = client
-            .post(INNERTUBE)
-            .header("Content-Type", "application/json")
-            .header("X-YouTube-Client-Name", "1")
-            .json(&body)
-            .send()
-            .await?
-            .error_for_status()?;
-        r.json::<Value>().await
-    }
-    .await
-    {
-        walk_videos(&v, &mut items);
+    // Innertube search — official RESUMEN/HIGHLIGHTS for both overlay seasons.
+    for query in ["RESUMEN LALIGA EA SPORTS", "RESUMEN LALIGA EA SPORTS 2025"] {
+        let body = serde_json::json!({
+            "context": { "client": { "clientName": "WEB", "clientVersion": "2.20260101.00.00", "hl": "en" } },
+            "query": query,
+            "params": "EgIQAQ=="
+        });
+        if let Ok(v) = async {
+            let r = client
+                .post(INNERTUBE)
+                .header("Content-Type", "application/json")
+                .header("X-YouTube-Client-Name", "1")
+                .json(&body)
+                .send()
+                .await?
+                .error_for_status()?;
+            r.json::<Value>().await
+        }
+        .await
+        {
+            walk_videos(&v, &mut items);
+        }
     }
     let mut seen = std::collections::HashSet::new();
     // Keep the copy with the higher duration when the same id appears twice.
@@ -359,8 +391,15 @@ fn walk_videos(v: &Value, out: &mut Vec<YtVid>) {
     }
 }
 
-async fn search_one(client: &reqwest::Client, home: &str, away: &str) -> Option<String> {
-    let q = format!("{home} {away} RESUMEN LALIGA EA SPORTS");
+async fn search_one(
+    client: &reqwest::Client,
+    home: &str,
+    away: &str,
+    year: &str,
+    hs: Option<i64>,
+    aws: Option<i64>,
+) -> Option<String> {
+    let q = format!("{home} {away} RESUMEN LALIGA EA SPORTS {year}");
     let body = serde_json::json!({
         "context": { "client": { "clientName": "WEB", "clientVersion": "2.20260101.00.00", "hl": "en" } },
         "query": q,
@@ -380,15 +419,16 @@ async fn search_one(client: &reqwest::Client, home: &str, away: &str) -> Option<
         .ok()?;
     let mut items = Vec::new();
     walk_videos(&v, &mut items);
-    pick_best(&items, home, away)
+    pick_best_scored(&items, home, away, hs, aws)
 }
 
 /// Matches of one beIN week that have a published official highlight.
 pub async fn fetch_week(client: &reqwest::Client, season: u64, round: u32) -> anyhow::Result<Vec<Match>> {
-    if season != BEIN_SEASON_2026 {
+    let Some(slug) = slug_for(season) else {
         return Ok(Vec::new());
-    }
-    let dump = load_season(client).await?;
+    };
+    let year = if season == BEIN_SEASON_2025 { "2025" } else { "2026" };
+    let dump = load_season(client, slug).await?;
     let index = load_yt_index(client).await;
     let mut known = known_ids().await;
 
@@ -410,27 +450,27 @@ pub async fn fetch_week(client: &reqwest::Client, season: u64, round: u32) -> an
         if status != "FullTime" {
             continue;
         }
+        let hs = raw.get("home_score").and_then(Value::as_i64);
+        let aws = raw.get("away_score").and_then(Value::as_i64);
         // Live index wins over the seed: landscape cuts are ~20 s longer than the
-        // vertical ones of the same match, so pick_best prefers them. Seed/disk
-        // map is only the fallback when the video is not in the current RSS/search.
-        let yt = pick_best(&index, &home_name, &away_name);
+        // vertical ones of the same match, so pick_best prefers them. Score in the
+        // title disambiguates the same fixture across 2025/26 and 2026/27.
+        let yt = pick_best_scored(&index, &home_name, &away_name, hs, aws).or_else(|| known.get(&id).cloned());
         let yt = match yt {
             Some(id) => Some(id),
-            None => known.get(&id).cloned(),
-        };
-        let yt = match yt {
-            Some(id) => Some(id),
-            None => search_one(client, &home_name, &away_name).await,
+            None => search_one(client, &home_name, &away_name, year, hs, aws).await,
         };
         let Some(yt) = yt else { continue };
         known.insert(id, yt.clone());
         remember(id, yt.clone()).await;
 
-        let hs = raw.get("home_score").and_then(Value::as_i64);
-        let aws = raw.get("away_score").and_then(Value::as_i64);
         let home = team_with_score(home_v, hs);
         let away = team_with_score(away_v, aws);
-        let score = format!("{}-{}", hs.map(|n| n.to_string()).unwrap_or_else(|| "–".into()), aws.map(|n| n.to_string()).unwrap_or_else(|| "–".into()));
+        let score = format!(
+            "{}-{}",
+            hs.map(|n| n.to_string()).unwrap_or_else(|| "–".into()),
+            aws.map(|n| n.to_string()).unwrap_or_else(|| "–".into())
+        );
         let title = format!("{} {score} {} Maç Özeti", home.name, away.name);
         let date = s(raw, "date");
         let date = if date.is_empty() { s(raw, "time") } else { date };
@@ -478,26 +518,14 @@ mod tests {
             "Deportivo Alavés",
             "Getafe CF"
         ));
-        assert!(title_matches(
-            "ELCHE CF 0 - 5 FC BARCELONA | RESUMEN LALIGA EA SPORTS",
-            "Elche CF",
-            "FC Barcelona"
-        ));
+        assert!(title_matches("ELCHE CF 0 - 5 FC BARCELONA | RESUMEN LALIGA EA SPORTS", "Elche CF", "FC Barcelona"));
         assert!(title_matches(
             "RCD ESPANYOL 1 - 2 REAL MADRID | HIGHLIGHTS LALIGA EA SPORTS",
             "RCD Espanyol de Barcelona",
             "Real Madrid"
         ));
-        assert!(title_matches(
-            "VALENCIA CF 0 - 0 CELTA | HIGHLIGHTS LALIGA EA SPORTS",
-            "Valencia CF",
-            "Celta"
-        ));
-        assert!(!title_matches(
-            "ELCHE CF vs FC BARCELONA | RUEDA DE PRENSA",
-            "Elche CF",
-            "FC Barcelona"
-        ));
+        assert!(title_matches("VALENCIA CF 0 - 0 CELTA | HIGHLIGHTS LALIGA EA SPORTS", "Valencia CF", "Celta"));
+        assert!(!title_matches("ELCHE CF vs FC BARCELONA | RUEDA DE PRENSA", "Elche CF", "FC Barcelona"));
         assert!(!title_matches(
             "DEPORTIVO ALAVÉS 3 - 0 GETAFE CF | RESUMEN LALIGA EA SPORTS",
             "Athletic Club",
@@ -508,10 +536,12 @@ mod tests {
     #[test]
     fn seed_covers_opening_matchweeks() {
         let m = seed_map();
-        assert_eq!(m.len(), 14);
+        assert!(m.len() >= 14);
         assert_eq!(m.get(&102249).unwrap(), "9WlsPzrTSqU");
         assert_eq!(m.get(&102262).unwrap(), "jV-hxmJQKfc");
         assert_eq!(m.get(&102260).unwrap(), "eDzd_2_7vzI");
+        assert_eq!(m.get(&98461).unwrap(), "K7r_YgyFevA");
+        assert_eq!(m.get(&98457).unwrap(), "mHPTne26Q0I");
     }
 
     #[test]
@@ -521,11 +551,23 @@ mod tests {
             YtVid { id: "4dPE5OkzbeQ".into(), title: title.into(), secs: 169 },
             YtVid { id: "eDzd_2_7vzI".into(), title: title.into(), secs: 194 },
         ];
-        assert_eq!(
-            pick_best(&cands, "Atlético de Madrid", "Villarreal CF").as_deref(),
-            Some("eDzd_2_7vzI")
-        );
+        assert_eq!(pick_best(&cands, "Atlético de Madrid", "Villarreal CF").as_deref(), Some("eDzd_2_7vzI"));
         assert_eq!(parse_clock("3:15"), 195);
         assert_eq!(parse_clock("2:48"), 168);
+    }
+
+    #[test]
+    fn score_in_title_uses_digit_boundaries() {
+        assert!(score_in_title("VILLARREAL CF 5 - 1 ATLÉTICO DE MADRID | RESUMEN LALIGA EA SPORTS", 5, 1));
+        assert!(score_in_title("ELCHE CF 0-5 FC BARCELONA | RESUMEN", 0, 5));
+        assert!(!score_in_title("TEAM 11 - 1 TEAM | RESUMEN", 1, 1));
+        assert!(score_in_title("TEAM 1 - 1 TEAM | RESUMEN", 1, 1));
+    }
+
+    #[test]
+    fn slug_covers_both_overlay_seasons() {
+        assert_eq!(slug_for(3968), Some("laliga-easports-2026"));
+        assert_eq!(slug_for(3850), Some("laliga-easports-2025"));
+        assert_eq!(slug_for(3717), None);
     }
 }

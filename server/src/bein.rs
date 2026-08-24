@@ -156,7 +156,7 @@ pub async fn fetch_week(client: &reqwest::Client, lg: League, season: u64, round
         .collect();
     out.sort_by(|a, b| a.date.cmp(&b.date));
     // beIN lists İspanya La Liga seasons/weeks but never publishes highlight mp4s
-    // (`{"Data":{}}` for 2024–2027). Overlay official 2026/2027 highlights instead.
+    // (`{"Data":{}}` for 2024–2027). Overlay official 2025/26 and 2026/27 highlights.
     if out.is_empty() && lg.id == "ispanya-la-liga" {
         return crate::laliga::fetch_week(client, season, round).await;
     }
@@ -170,6 +170,6 @@ pub struct WeekQuery {
     pub l: Option<String>,
     pub s: Option<u64>,
     pub r: Option<u32>,
-    /// `hd` → play the YouTube remux when one is attached (Süper Lig HD toggle).
+    /// `hd` → play the YouTube remux when one is attached (Süper Lig / Premier League HD).
     pub q: Option<String>,
 }

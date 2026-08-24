@@ -9,6 +9,46 @@ struct League: Identifiable, Hashable {
         League(id: "ingiltere-premier-ligi", name: "İngiltere Premier Lig", orgId: 17),
         League(id: "ispanya-la-liga", name: "İspanya La Liga", orgId: 60),
     ]
+    var usesHdToggle: Bool { id == "super-lig" || id == "ingiltere-premier-ligi" }
+    var isLaLiga: Bool { id == "ispanya-la-liga" }
+}
+
+enum Beinv {
+    static let host = "https://beinv.bjk.ai"
+    static func video(league: League, seasonId: Int, round: Int, matchId: Int) -> String {
+        "\(host)/video/m/\(matchId)?l=\(league.id)&s=\(seasonId)&r=\(round)&q=hd"
+    }
+}
+
+struct BeinvTeam: Codable {
+    var name: String?
+    var logo: String?
+    var score: Int?
+}
+
+struct BeinvMatch: Codable {
+    var id: Int
+    var round: Int?
+    var title: String?
+    var date: String?
+    var home: BeinvTeam?
+    var away: BeinvTeam?
+    var thumb: String?
+    var has_highlight: Bool?
+    func asMatch(league: League, seasonId: Int) -> Match {
+        var m = Match(
+            matchId: id,
+            matchDate: date,
+            highLightTitle: title,
+            highlightThumbnail: thumb,
+            highlightVideoUrl: Beinv.video(league: league, seasonId: seasonId, round: round ?? 0, matchId: id),
+            homeTeam: Team(name: home?.name, logo: home?.logo, matchScore: home?.score),
+            awayTeam: Team(name: away?.name, logo: away?.logo, matchScore: away?.score),
+            matchEvents: nil
+        )
+        m.round = round
+        return m
+    }
 }
 
 enum Mode: String, CaseIterable, Identifiable {
@@ -163,6 +203,16 @@ struct Match: Codable, Hashable, Identifiable {
         return "\(homeTeam?.name ?? "?") - \(awayTeam?.name ?? "?")"
     }
     func involves(_ team: String) -> Bool { homeTeam?.name == team || awayTeam?.name == team }
+
+    /// Swap the full highlight onto the remux proxy (HD / La Liga). Goal clips stay on beIN.
+    func playable(league: League, seasonId: Int, round: Int, hd: Bool) -> Match {
+        guard let id = matchId else { return self }
+        var m = self
+        if league.isLaLiga || (hd && league.usesHdToggle) {
+            m.highlightVideoUrl = Beinv.video(league: league, seasonId: seasonId, round: round, matchId: id)
+        }
+        return m
+    }
 
     /// Full highlight followed by every clip — the player's playlist.
     var playlist: [Clip] {

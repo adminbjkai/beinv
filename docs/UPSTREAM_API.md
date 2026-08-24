@@ -2,7 +2,7 @@
 
 Verified live 2026-08-22. No auth, cookies, or tokens needed. All calls are plain GET.
 
-Used by all clients: the Rust server (`server/src/bein.rs`, `video.rs`), the Apple TV app (`tv/Highlights/API.swift`) and the Android app (`android/app/src/main/java/ai/bjk/highlights/Api.kt`). The native apps hand `highlightVideoUrl` straight to AVPlayer / ExoPlayer.
+Used by all clients: the Rust server (`server/src/bein.rs`, `video.rs`), the Apple TV app (`tv/Highlights/API.swift`) and the Android app (`android/app/src/main/java/ai/bjk/highlights/Api.kt`). Süper Lig / Premier League catalogs still come from beIN on native; HD full-highlights and every La Liga video play from `https://beinv.bjk.ai/video/…`.
 
 ## Leagues we use
 
@@ -45,7 +45,7 @@ GET https://beinsports.com.tr/api/highlights/events?sp={sportId}&o={orgId}&s={se
 ```
 - `type`: 0 = goal, 1 = position/other clip.
 - **Premier League** matches come back with `matchEvents: null` (only the full highlight exists upstream, checked across several seasons/weeks on 2026-08-22). Goals / By-team-Goals modes are therefore empty for that league by data, not by bug.
-- **İspanya La Liga**: the seasons/weeks payload is populated (current 2026/2027 = season id `3968`, 38 weeks) but `highlights/events` is `{"Data":{}}` for every season checked (2024/25–2026/27). The web server does **not** leave the league empty: see [La Liga overlay](#d-la-liga-20262027-overlay-web-server) below.
+- **İspanya La Liga**: the seasons/weeks payload is populated (current 2026/2027 = season id `3968`; 2025/2026 = `3850`; 38 weeks each) but `highlights/events` is `{"Data":{}}` for every season checked (2024/25–2026/27). The server does **not** leave those two seasons empty: see [La Liga overlay](#d-la-liga-overlay-web-server) below.
 - Empty/tiny body (`{}`) means the week has no published highlights yet.
 - Path/query variants on the HTML page (`/super-lig/2026-2027/1`, `?week=1`) do NOT work.
 
@@ -60,18 +60,19 @@ GET {highlightVideoUrl}
 - The `hdnts` value is static and the file also serves without it; no Referer needed.
 - Event clips already carry the final mp4 in `sourceVideoUrl` (no redirect).
 
-## D. La Liga 2026/2027 overlay (web server)
+## D. La Liga overlay (web server + native via remux host)
 
-Used only when beIN returns no events for `ispanya-la-liga` and the beIN season id is `3968` (2026/2027). Native Android/tvOS clients do not use this path.
+Used when beIN returns no events for `ispanya-la-liga` and the beIN season id is `3968` (2026/2027, slug `laliga-easports-2026`) or `3850` (2025/2026, slug `laliga-easports-2025`). Native Android/tvOS load the same weeks from `https://beinv.bjk.ai/api/leagues/ispanya-la-liga/seasons/{id}/weeks/{round}` and play `/video/m/{id}`.
 
-**Fixtures + scores** (cache 5 min), public key taken from laliga.com's own `runtimeConfig`:
+**Fixtures + scores** (cache 5 min, keyed per slug), public key taken from laliga.com's own `runtimeConfig`:
 
 ```
 GET https://apim.laliga.com/public-service/api/v1/matches?subscriptionSlug=laliga-easports-2026&limit=100&offset=0
+GET https://apim.laliga.com/public-service/api/v1/matches?subscriptionSlug=laliga-easports-2025&limit=100&offset=0
 Header: Ocp-Apim-Subscription-Key: c13c3a8e2f6b46da9c5c425cf61fab3e
 ```
 
-380 matches, `gameweek.week` = 1…38, `status` `FullTime` | `PreMatch`, team shields on `home_team.shield.url`.
+380 matches per season, `gameweek.week` = 1…38, `status` `FullTime` | `PreMatch`, team shields on `home_team.shield.url`. Score in the YouTube title disambiguates the same two clubs across seasons.
 
 **Highlights** are the official [LALIGA YouTube channel](https://www.youtube.com/@LaLiga) (`UCTv-XvfzLX3i4IGWAm4sbmA`) videos titled `HOME s - s AWAY | RESUMEN LALIGA EA SPORTS` (or `HIGHLIGHTS`). This is automatic for the whole season — the same “publish then appear” rhythm as beIN for Süper Lig / Premier League:
 
@@ -85,11 +86,15 @@ Header: Ocp-Apim-Subscription-Key: c13c3a8e2f6b46da9c5c425cf61fab3e
 
 Unplayed fixtures are omitted (same as beIN only listing matches that already have a highlight). Goals / By-team-Goals stay empty: there are no per-goal clips.
 
-## E. Süper Lig HD overlay (web, optional)
+## E. Süper Lig HD overlay
 
-Default Süper Lig playback is still the beIN mp4 from §C (including goal clips). The web **HD** toggle (`?q=hd` on `/video/m/{id}`, `has_hd` on the match JSON) swaps **only the full highlight** for a remux of the official [beIN SPORTS Türkiye](https://www.youtube.com/@beINSPORTSTurkiye) channel (`UCPe9vNjHF1kEExT5kHwc7aw`).
+Default Süper Lig playback is the official [beIN SPORTS Türkiye](https://www.youtube.com/@beINSPORTSTurkiye) remux (`q=hd`, channel `UCPe9vNjHF1kEExT5kHwc7aw`). Turning HD off falls back to the beIN mp4 from §C (goal clips always stay on beIN). `has_hd` on the match JSON; `?q=hd` on `/video/m/{id}`.
 
 Titles look like `Alanyaspor - Beşiktaş - Highlights/Özet | Trendyol Süper Lig - 2026/27` (shirt-sponsor prefixes dropped). Same automatic loop as §D: RSS + search every 5 minutes, longest matching cut, prefetch on week load, disk map `{BEINV_VIDEO_CACHE}/superlig-map.json`. Bootstrap seed: `server/src/data/superlig-youtube.json` (e.g. Beşiktaş week 2 2026/27 = `QJ31yOM88UQ`). Season id `3974` only. 1. Lig / press-conference / single-goal clips are ignored.
+
+## F. Premier League HD overlay
+
+Same toggle as §E, **on by default**, for İngiltere Premier Lig 2026/2027 (beIN season `3958`). Source is the official [NBC Sports](https://www.youtube.com/@NBCSports) channel (`UCqZQlzSHbVJrwrn5XvzrzcA`). Titles: `Manchester City v. Bournemouth | PREMIER LEAGUE HIGHLIGHTS | 8/23/2026 | NBC Sports`. Matching uses both clubs (aliases: `Newcastle Utd.` → Newcastle, `Brighton and Hove Albion` → Brighton, `Tottenham` → Tottenham Hotspur), the kickoff `M/D/YYYY` so prior seasons do not collide, and duration ≥ 8 minutes so goal clips are dropped. RSS on this channel is mixed-sport and usually has no PL highlights — Innertube search is the live index. Disk map `{BEINV_VIDEO_CACHE}/premier-map.json`. Bootstrap seed: `server/src/data/premier-youtube.json` (City–Bournemouth week 1 = `8bWcZxr_bKE` / match `1510542`).
 
 ## Other gateway endpoints seen (not used)
 `/api/match/{id}`, `/api/match/{id}/lineups|facts|comments`, `/api/live/{id}`,

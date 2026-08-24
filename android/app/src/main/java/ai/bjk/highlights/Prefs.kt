@@ -30,4 +30,14 @@ class Prefs(context: Context) {
     var onlyTeam: Boolean
         get() = sp.getBoolean("onlyTeam", true)
         set(v) = sp.edit().putBoolean("onlyTeam", v).apply()
+
+    /** HD remux for Super Lig / Premier League (default ON). */
+    var hd: Boolean
+        get() = sp.getBoolean("hd", true)
+        set(v) = sp.edit().putBoolean("hd", v).apply()
+
+    /** Highlights/Goals show every week until the user picks one. */
+    var allWeeks: Boolean
+        get() = sp.getBoolean("allWeeks", true)
+        set(v) = sp.edit().putBoolean("allWeeks", v).apply()
 }

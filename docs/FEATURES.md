@@ -1,12 +1,12 @@
-# Feature spec (v2.6) — applies to all clients
+# Feature spec (v2.7) — applies to all clients
 
 All three clients (web, Android, Apple TV) implement the same feature set with platform-native UI. Data comes only from the endpoints in [UPSTREAM_API.md](UPSTREAM_API.md).
 
 ## 0. Parity rules (every client, same structure and wording)
 Top-to-bottom layout, identical labels:
 1. **League** switch: `Trendyol Süper Lig` | `İngiltere Premier Lig` | `İspanya La Liga` (exact names).
-2. **Season** picker (label "Season") — always visible and selectable in every mode; changing it resets week to that season's default.
-3. **Week** picker (label "Week") with ‹ › — visible in Highlights and Goals modes; hidden only in By team.
+2. **Season** picker (label "Season") — always visible and selectable in every mode; changing it resets the week view to **All weeks**.
+3. **Week** rail (label "Week") — visible in Highlights and Goals; hidden only in By team. First item is **All weeks** (default): every published match of the season, grouped by week. Picking a week filters to that round. Desktop/tvOS: vertical list on the left. Phone: horizontal chips.
 4. **Mode** switch: `Highlights` | `Goals` | `By team`.
 5. Mode-specific row:
    - By team → **Team** picker (label "Team", logo + name, A–Z), then a `Matches` | `Goals` sub-switch, and — when Goals is active — a toggle `Only <Team> goals` (default ON).
@@ -17,12 +17,12 @@ Every selection change must be reflected immediately and persist (see §1). No m
 ## 1. Navigation & selection
 - **League**: Trendyol Süper Lig / İngiltere Premier Lig / İspanya La Liga.
 - **Season**: always-visible picker listing every season from endpoint A (newest first). Default: `isCurrent`.
-- **Week**: picker + ‹ › stepping. Default: `currentWeekForFixture`, else the last week.
-- **Remember** last league/season/week (web: URL + localStorage; Android: DataStore/SharedPreferences; tvOS: UserDefaults).
-- **HD** (web, Trendyol Süper Lig only): toggle labelled `HD`. Off (default) plays the beIN mp4, including goal clips. On plays the official beIN SPORTS Türkiye YouTube full-match özet remuxed to the same player (1080p when published). Persisted in the URL (`hd=1`) and localStorage. Goal clips stay on the beIN feed. Android/tvOS have no HD toggle.
+- **Week**: rail with **All weeks** (default) plus every round. Default for Highlights/Goals is the whole season; a deep link `r=<n>` still opens that week. Cards and section headers show the week name.
+- **Remember** last league/season/week (web: URL + localStorage; Android: SharedPreferences; tvOS: UserDefaults).
+- **HD** (Trendyol Süper Lig and İngiltere Premier Lig, all clients): toggle labelled `HD`, **on by default**. Off plays the beIN mp4 (including goal clips). On plays the official YouTube full-match remux in the same player (Süper Lig: beIN SPORTS Türkiye; Premier League: NBC Sports). Web: `?q=hd` on `/video/m/{id}`, `hd=1`/`hd=0` in the URL. Native: `https://beinv.bjk.ai/video/m/{id}?…&q=hd`. Goal clips stay on the beIN feed.
 
 ## 2. Views (mode toggle)
-- **Highlights** (default): match cards for the selected week. Premier League and İspanya La Liga are full-match highlights only (no per-goal clips); Goals / By-team-Goals are empty by data, not by bug. On web, La Liga 2026/2027 cards are filled from the overlay in [UPSTREAM_API.md §D](UPSTREAM_API.md); Android/tvOS talk to beIN directly so that league's weeks stay empty until beIN publishes mp4s.
+- **Highlights** (default): match cards for **All weeks** (grouped by week) or one round. Premier League and İspanya La Liga are full-match highlights only (no per-goal clips); Goals / By-team-Goals are empty by data, not by bug. La Liga 2025/2026 and 2026/2027 cards are filled from the overlay in [UPSTREAM_API.md §D](UPSTREAM_API.md). Native clients load that overlay through `https://beinv.bjk.ai`.
 - **Goals**: only goal clips (`type == 0`) for the selected week, grouped by match (match header: home logo, scoreline, away logo). Includes **Play all** → sequential playlist of every goal in the week.
   - **Each goal card/row shows**: minute, scorer (event description), **scoring team** (logo + name derived from `eventTeamSide` Home/Away → that match's team), and the **running score after that goal** (e.g. `0–1`, `0–2`, …), computed by walking the match's goals in minute order and incrementing the side that scored. Own-goal/unknown side (`eventTeamSide` null): show the scoreline without the increment and mark the team as "—".
   - Cards are visually attributed to the scoring team: team logo on the card, and the running score highlights the scoring side.

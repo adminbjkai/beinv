@@ -4,16 +4,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -111,11 +113,13 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
     var team by rememberSaveable { mutableStateOf(prefs.team(league)) }
     var teamGoals by rememberSaveable { mutableStateOf(prefs.teamGoals) }
     var onlyTeam by rememberSaveable { mutableStateOf(prefs.onlyTeam) }
+    var hd by rememberSaveable { mutableStateOf(prefs.hd) }
+    var allWeeks by rememberSaveable { mutableStateOf(prefs.allWeeks) }
     // Team is remembered per league (restored on relaunch); a team missing from the chosen season falls back to the list.
     LaunchedEffect(league) { team = prefs.team(league) }
     fun pickTeam(name: String) { team = name; prefs.saveTeam(league, name) }
-    LaunchedEffect(league, seasonId, weeks.size, mode == Mode.ByTeam, seasonRetry) {
-        if (mode != Mode.ByTeam) return@LaunchedEffect
+    LaunchedEffect(league, seasonId, weeks.size, mode == Mode.ByTeam, allWeeks, seasonRetry) {
+        if (mode != Mode.ByTeam && !allWeeks) return@LaunchedEffect
         val sid = seasonId ?: return@LaunchedEffect
         if (weeks.isEmpty()) return@LaunchedEffect
         seasonData = Load.Loading; seasonProgress = 0
@@ -124,6 +128,13 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
         } catch (e: Exception) {
             Load.Error(e.message ?: "Failed to load")
         }
+    }
+    LaunchedEffect(hd, allWeeks) { prefs.hd = hd; prefs.allWeeks = allWeeks }
+
+    fun playMatch(e: Entry) {
+        val sid = seasonId ?: return
+        val m = e.match.playable(league, sid, e.round, hd)
+        onPlay(Playlist(m.title, m.clips()))
     }
 
     val seasonOk = (seasonData as? Load.Ok)?.value
@@ -160,29 +171,23 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                         val s = seasonList[i]
                         seasonId = s.id
                         round = defaultRound(s)
+                        allWeeks = true
                     }
-                }
-                if (mode != Mode.ByTeam) Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text("Week", color = TextGray, style = MaterialTheme.typography.labelLarge)
-                    val wi = weeks.indexOfFirst { it.round == round }
-                    IconButton(onClick = { if (wi > 0) round = weeks[wi - 1].round }, enabled = wi > 0) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous week")
-                    }
-                    Dropdown(
-                        label = weeks.getOrNull(wi)?.weekName ?: "Week",
-                        items = weeks.map { it.weekName ?: "${it.round}" },
-                        modifier = Modifier.weight(1f),
-                    ) { i -> round = weeks[i].round }
-                    IconButton(
-                        onClick = { if (wi in 0 until weeks.size - 1) round = weeks[wi + 1].round },
-                        enabled = wi in 0 until weeks.size - 1,
-                    ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next week") }
                 }
                 Segmented(Mode.entries.map { it.label }, mode.ordinal) { mode = Mode.entries[it] }
+                if (league.usesHdToggle()) Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("HD", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = hd, onCheckedChange = { hd = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Background, checkedTrackColor = Emerald,
+                            uncheckedThumbColor = TextGray, uncheckedTrackColor = Surface,
+                        ),
+                    )
+                }
                 if (mode == Mode.ByTeam) {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -243,22 +248,59 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                                         .sortedByDescending { it.match.matchDate ?: "" }
                                         .map { Entry(weekName(it.round), it.round, it.match) }
                                 }
-                                // Stable identity so GoalsView's `remember` below actually holds.
                                 val filter: (GoalRow) -> Boolean = remember(onlyTeam, t.name) {
                                     if (onlyTeam) ({ g: GoalRow -> g.team?.name == t.name }) else ({ _: GoalRow -> true })
                                 }
-                                Content(mine, goalsOnly = teamGoals, onPlay = onPlay, title = t.name, goalFilter = filter,
+                                Content(mine, goalsOnly = teamGoals, onOpen = { playMatch(it) }, onPlay = onPlay,
+                                    title = t.name, goalFilter = filter,
                                     emptyMsg = "No highlights for ${t.name} this season yet.")
                             }
                         }
                     }
-                } else when (val m = matches) {
-                    Load.Loading -> SkeletonGrid()
-                    is Load.Error -> Centered { ErrorBox(m.msg) { matchesRetry++ } }
-                    is Load.Ok -> Content(
-                        m.value.map { Entry(if (mode == Mode.Goals) round?.let { r -> weekName(r) } else null, round ?: 0, it) },
-                        goalsOnly = mode == Mode.Goals,
-                        onPlay = onPlay, title = round?.let { weekName(it) } ?: "Goals")
+                } else {
+                    val wide = LocalConfiguration.current.screenWidthDp > 700
+                    Row(Modifier.fillMaxSize()) {
+                        if (wide) WeekRail(
+                            weeks = weeks, allWeeks = allWeeks, round = round,
+                            onAll = { allWeeks = true },
+                            onWeek = { allWeeks = false; round = it },
+                            modifier = Modifier.fillMaxHeight().width(148.dp).background(Surface),
+                        )
+                        Column(Modifier.weight(1f).fillMaxHeight()) {
+                            if (!wide) WeekRail(
+                                weeks = weeks, allWeeks = allWeeks, round = round,
+                                onAll = { allWeeks = true },
+                                onWeek = { allWeeks = false; round = it },
+                                horizontal = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            if (allWeeks) when (val d = seasonData) {
+                                Load.Loading -> Centered {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        CircularProgressIndicator(color = Emerald)
+                                        Spacer(Modifier.height(12.dp))
+                                        Text("Loading season… $seasonProgress/${weeks.size}", color = TextGray)
+                                    }
+                                }
+                                is Load.Error -> Centered { ErrorBox(d.msg) { seasonRetry++ } }
+                                is Load.Ok -> {
+                                    val entries = d.value.sortedBy { it.match.matchDate ?: "" }
+                                        .map { Entry(weekName(it.round), it.round, it.match) }
+                                    Content(entries, goalsOnly = mode == Mode.Goals, onOpen = { playMatch(it) },
+                                        onPlay = onPlay, title = "Season",
+                                        emptyMsg = "No highlights published for this season yet.")
+                                }
+                            } else when (val m = matches) {
+                                Load.Loading -> SkeletonGrid()
+                                is Load.Error -> Centered { ErrorBox(m.msg) { matchesRetry++ } }
+                                is Load.Ok -> Content(
+                                    m.value.map { Entry(round?.let { r -> weekName(r) }, round ?: 0, it) },
+                                    goalsOnly = mode == Mode.Goals,
+                                    onOpen = { playMatch(it) }, onPlay = onPlay,
+                                    title = round?.let { weekName(it) } ?: "Goals")
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -267,7 +309,8 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
 
 @Composable
 private fun Content(
-    entries: List<Entry>, goalsOnly: Boolean, title: String, onPlay: (Playlist) -> Unit,
+    entries: List<Entry>, goalsOnly: Boolean, title: String,
+    onOpen: (Entry) -> Unit, onPlay: (Playlist) -> Unit,
     goalFilter: (GoalRow) -> Boolean = { true },
     emptyMsg: String = "No highlights published for this week yet.",
 ) {
@@ -275,11 +318,11 @@ private fun Content(
         Centered { Text(emptyMsg, color = TextGray, textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp)) }
         return
     }
-    if (goalsOnly) GoalsView(entries, title, goalFilter, onPlay) else MatchGrid(entries, onPlay)
+    if (goalsOnly) GoalsView(entries, title, goalFilter, onPlay) else MatchGrid(entries, onOpen)
 }
 
 @Composable
-private fun MatchGrid(entries: List<Entry>, onPlay: (Playlist) -> Unit) {
+private fun MatchGrid(entries: List<Entry>, onOpen: (Entry) -> Unit) {
     val wide = LocalConfiguration.current.screenWidthDp > 600
     LazyVerticalGrid(
         columns = GridCells.Fixed(if (wide) 3 else 2),
@@ -287,8 +330,57 @@ private fun MatchGrid(entries: List<Entry>, onPlay: (Playlist) -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(entries, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { (w, _, m) ->
-            MatchCard(m, w) { onPlay(Playlist(m.title, m.clips())) }
+        items(entries, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { e ->
+            MatchCard(e.match, e.week) { onOpen(e) }
+        }
+    }
+}
+
+@Composable
+private fun WeekRail(
+    weeks: List<Week>, allWeeks: Boolean, round: Int?,
+    onAll: () -> Unit, onWeek: (Int) -> Unit,
+    modifier: Modifier = Modifier, horizontal: Boolean = false,
+) {
+    val chip: @Composable (Boolean, String, () -> Unit) -> Unit = { on, label, click ->
+        val shape = RoundedCornerShape(10.dp)
+        Text(
+            label,
+            color = if (on) Background else OnDark,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .then(if (horizontal) Modifier else Modifier.fillMaxWidth())
+                .clip(shape)
+                .background(if (on) Emerald else Background.copy(alpha = 0.4f))
+                .clickable(onClick = click)
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+        )
+    }
+    if (horizontal) {
+        LazyRow(
+            modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            item { chip(allWeeks, "All weeks", onAll) }
+            items(weeks, key = { it.round ?: it.hashCode() }) { w ->
+                val r = w.round ?: return@items
+                chip(!allWeeks && round == r, w.weekName ?: "Week $r") { onWeek(r) }
+            }
+        }
+    } else {
+        Column(
+            modifier = modifier.verticalScroll(rememberScrollState()).padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Week", color = TextGray, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 4.dp))
+            chip(allWeeks, "All weeks", onAll)
+            weeks.forEach { w ->
+                val r = w.round ?: return@forEach
+                chip(!allWeeks && round == r, w.weekName ?: "Week $r") { onWeek(r) }
+            }
         }
     }
 }

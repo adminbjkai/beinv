@@ -50,12 +50,20 @@ object Api {
     suspend fun matches(league: League, seasonId: Int, round: Int): List<Match> {
         val key = "${league.orgId}/$seasonId/$round"
         matchesCache[key]?.let { return it }
-        val body = get("https://beinsports.com.tr/api/highlights/events?sp=1&o=${league.orgId}&s=$seasonId&r=$round&st=0")
-        val list = if (body.trim().length < 3) emptyList() else runCatching {
-            json.decodeFromString<EventsResponse>(body).Data?.events.orEmpty()
-        }.getOrDefault(emptyList())
-        val filtered = list.filter { !it.highlightVideoUrl.isNullOrBlank() }
-            .sortedBy { it.matchDate ?: "" }
+        val filtered = if (league.isLaLiga()) {
+            val body = get("$BEINV/api/leagues/${league.id}/seasons/$seasonId/weeks/$round")
+            runCatching { json.decodeFromString<List<BeinvMatch>>(body) }.getOrDefault(emptyList())
+                .filter { it.has_highlight }
+                .map { it.toMatch(league, seasonId) }
+                .sortedBy { it.matchDate ?: "" }
+        } else {
+            val body = get("https://beinsports.com.tr/api/highlights/events?sp=1&o=${league.orgId}&s=$seasonId&r=$round&st=0")
+            val list = if (body.trim().length < 3) emptyList() else runCatching {
+                json.decodeFromString<EventsResponse>(body).Data?.events.orEmpty()
+            }.getOrDefault(emptyList())
+            list.filter { !it.highlightVideoUrl.isNullOrBlank() }
+                .sortedBy { it.matchDate ?: "" }
+        }
         matchesCache[key] = filtered
         return filtered
     }

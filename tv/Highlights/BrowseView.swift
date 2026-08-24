@@ -20,6 +20,8 @@ final class BrowseModel: ObservableObject {
     @Published var teamGoals = false
     /// By team → Goals: "Only <Team> goals" (default ON).
     @Published var onlyTeamGoals = true
+    @Published var hd: Bool { didSet { prefs.set(hd, forKey: "hd") } }
+    @Published var allWeeks: Bool { didSet { prefs.set(allWeeks, forKey: "allWeeks"); if allWeeks { Task { await loadSeason() } } } }
     var showingGoals: Bool { mode == .goals || (mode == .team && team != nil && teamGoals) }
     @Published var loading = false
     @Published var error: String?
@@ -32,6 +34,8 @@ final class BrowseModel: ObservableObject {
         }
         league = League.all.first { $0.id == d.string(forKey: "league") } ?? League.all[0]
         mode = Mode(rawValue: d.string(forKey: "mode") ?? "") ?? .highlights
+        hd = d.object(forKey: "hd") as? Bool ?? true
+        allWeeks = d.object(forKey: "allWeeks") as? Bool ?? true
     }
 
     var season: Season? { seasons.first { $0.id == seasonId } }
@@ -44,7 +48,11 @@ final class BrowseModel: ObservableObject {
     var teamRef: TeamRef? { teams.first { $0.name == team } }
     var teamMatches: [Match] { team.map { t in seasonMatches.filter { $0.involves(t) } } ?? [] }
     /// Matches shown in the current mode (week, or the team's season).
-    var visible: [Match] { mode == .team ? teamMatches : matches }
+    var visible: [Match] {
+        if mode == .team { return teamMatches }
+        if allWeeks { return seasonMatches.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) } }
+        return matches
+    }
     /// Goal rows per visible match, honouring the "Only <Team> goals" filter.
     func goalRows(of m: Match) -> [GoalRow] {
         let rows = m.goalRows.filter { $0.event.clipURL != nil }
@@ -79,7 +87,7 @@ final class BrowseModel: ObservableObject {
         let saved = restoreSavedWeek ? prefs.object(forKey: "week") as? Int : nil
         restoreSavedWeek = false
         round = (w.first { $0.round == saved } ?? w.first { $0.currentWeekForFixture == true } ?? w.last)?.round
-        if mode == .team { Task { await loadSeason() } }
+        if mode == .team || allWeeks { Task { await loadSeason() } }
     }
 
     func loadMatches() async {
@@ -96,6 +104,7 @@ final class BrowseModel: ObservableObject {
 
     func loadSeason() async {
         guard let sid = seasonId, seasonMatches.isEmpty, seasonProgress == nil else { return }
+        // also used by Highlights/Goals "All weeks"
         let rounds = weeks.compactMap(\.round)
         // The season's weeks may not have arrived yet. Fetching with no rounds would cache an empty
         // season for the rest of the run, leaving "By team" permanently empty.
@@ -157,10 +166,12 @@ struct BrowseView: View {
             VStack(alignment: .leading, spacing: 14) {
                 leagueRow
                 seasonRow
-                if model.mode != .team { weekRow }
                 modeRow
                 modeSpecificRow
-                content
+                HStack(alignment: .top, spacing: 28) {
+                    if model.mode != .team { weekRail }
+                    content
+                }
             }
             .padding(.horizontal, 60)
             .padding(.top, 30)
@@ -196,16 +207,25 @@ struct BrowseView: View {
         .buttonStyle(.bordered).font(.callout).focusSection()
     }
 
-    private var weekRow: some View {
-        HStack(spacing: 20) {
-            rowLabel("Week")
-            Button("‹") { model.step(-1) }.accessibilityIdentifier("week.prev")
-            Button(model.weekName(model.round).isEmpty ? "Week" : model.weekName(model.round)) { picker = .week }
-                .disabled(model.weeks.isEmpty)
-                .accessibilityIdentifier("week.button")
-            Button("›") { model.step(1) }.accessibilityIdentifier("week.next")
-            Spacer()
+    private var weekRail: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Week").font(.caption).foregroundStyle(Theme.secondaryText)
+            Button("All weeks") { model.allWeeks = true }
+                .foregroundStyle(model.allWeeks ? Theme.accent : .primary)
+                .accessibilityIdentifier("week.all")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(model.weeks) { w in
+                        Button(w.weekName ?? "Week \(w.round ?? 0)") {
+                            model.allWeeks = false
+                            model.round = w.round
+                        }
+                        .foregroundStyle(!model.allWeeks && model.round == w.round ? Theme.accent : .primary)
+                    }
+                }
+            }
         }
+        .frame(width: 220)
         .buttonStyle(.bordered).font(.callout).focusSection()
     }
 
@@ -215,6 +235,11 @@ struct BrowseView: View {
                 Button(m.label) { model.mode = m }
                     .foregroundStyle(model.mode == m ? Theme.accent : .primary)
                     .accessibilityIdentifier("mode.\(m.rawValue)")
+            }
+            if model.league.usesHdToggle {
+                Button(model.hd ? "HD on" : "HD off") { model.hd.toggle() }
+                    .foregroundStyle(model.hd ? Theme.accent : .primary)
+                    .accessibilityIdentifier("hd.toggle")
             }
             Spacer()
         }
@@ -297,7 +322,7 @@ struct BrowseView: View {
                 Text(err).foregroundStyle(Theme.secondaryText)
                 Button("Retry") { model.retry() }.buttonStyle(.bordered)
             }.frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let (done, total) = model.seasonProgress, model.mode == .team {
+        } else if let (done, total) = model.seasonProgress, model.mode == .team || model.allWeeks {
             VStack(spacing: 20) {
                 ProgressView(value: Double(done), total: Double(max(total, 1))).tint(Theme.accent).frame(width: 500)
                 Text("Loading season… \(done)/\(total)").foregroundStyle(Theme.secondaryText)
@@ -309,7 +334,7 @@ struct BrowseView: View {
         } else if model.showingGoals {
             goalsGrid
         } else if model.visible.isEmpty {
-            empty(model.mode == .team ? "No highlights for this team yet." : "No highlights published for this week yet.")
+            empty(model.mode == .team ? "No highlights for this team yet." : (model.allWeeks ? "No highlights published for this season yet." : "No highlights published for this week yet."))
         } else {
             matchGrid
         }
@@ -336,8 +361,12 @@ struct BrowseView: View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 50) {
                 ForEach(model.visible) { m in
-                    Button { playback = Playback(clips: m.playlist) } label: {
-                        MatchCard(match: m, subtitle: model.mode == .team ? model.weekName(m.round) : nil)
+                    Button {
+                        let r = m.round ?? model.round ?? 0
+                        let sid = model.seasonId ?? 0
+                        playback = Playback(clips: m.playable(league: model.league, seasonId: sid, round: r, hd: model.hd).playlist)
+                    } label: {
+                        MatchCard(match: m, subtitle: (model.mode == .team || model.allWeeks) ? model.weekName(m.round) : nil)
                     }
                     .buttonStyle(.card)
                     .onLongPressGesture { clips = m }

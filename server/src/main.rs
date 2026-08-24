@@ -1,5 +1,6 @@
 mod bein;
 mod laliga;
+mod premier;
 mod superlig;
 mod video;
 mod youtube;
@@ -61,8 +62,10 @@ async fn load_week(app: &App, lg: League, season: u64, round: u32) -> anyhow::Re
         .weeks
         .try_get_with(key, async {
             let mut ms = bein::fetch_week(&app.http, lg, season, round).await?;
-            if lg.id == "super-lig" {
-                superlig::attach_hd(&app.http, season, &mut ms).await;
+            match lg.id {
+                "super-lig" => superlig::attach_hd(&app.http, season, &mut ms).await,
+                "ingiltere-premier-ligi" => premier::attach_hd(&app.http, season, &mut ms).await,
+                _ => {}
             }
             for m in &ms {
                 if !m.highlight_url.is_empty() {

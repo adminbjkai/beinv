@@ -20,13 +20,23 @@ actor API {
     func matches(league: League, seasonId: Int, round: Int) async throws -> [Match] {
         let key = "\(league.orgId)-\(seasonId)-\(round)"
         if let cached = matchCache[key] { return cached }
-        let url = URL(string: "https://beinsports.com.tr/api/highlights/events?sp=1&o=\(league.orgId)&s=\(seasonId)&r=\(round)&st=0")!
-        let data = try await get(url)
-        let events = (try? JSONDecoder().decode(EventsResponse.self, from: data))?.Data?.events ?? []
-        let matches = events
-            .filter { $0.videoURL != nil }
-            .sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
-            .map { var m = $0; m.round = round; return m }
+        let matches: [Match]
+        if league.isLaLiga {
+            let url = URL(string: "\(Beinv.host)/api/leagues/\(league.id)/seasons/\(seasonId)/weeks/\(round)")!
+            let data = try await get(url)
+            let list = (try? JSONDecoder().decode([BeinvMatch].self, from: data)) ?? []
+            matches = list.filter { $0.has_highlight == true }
+                .map { $0.asMatch(league: league, seasonId: seasonId) }
+                .sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+        } else {
+            let url = URL(string: "https://beinsports.com.tr/api/highlights/events?sp=1&o=\(league.orgId)&s=\(seasonId)&r=\(round)&st=0")!
+            let data = try await get(url)
+            let events = (try? JSONDecoder().decode(EventsResponse.self, from: data))?.Data?.events ?? []
+            matches = events
+                .filter { $0.videoURL != nil }
+                .sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+                .map { var m = $0; m.round = round; return m }
+        }
         matchCache[key] = matches
         return matches
     }
