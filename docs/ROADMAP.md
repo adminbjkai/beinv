@@ -43,7 +43,7 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
 - **Web verified live.** Android Pixel_9 + tvOS Living Room Apple TV verified: [NATIVE_RESUME.md](NATIVE_RESUME.md).
 
 ## v2.7.1 — native parity polish ✅
-- Week section headers on Android/tvOS; web HD remembered; week-rail scroll + `[`/`]`; remux warm from native; Apple TV device install.
+- Week section headers on Android/tvOS; web HD remembered; week-rail scroll + `[`/`]`; remux warm from native; Apple TV device install + UI tests.
 
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.
