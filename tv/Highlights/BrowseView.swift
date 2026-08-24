@@ -171,6 +171,8 @@ struct BrowseView: View {
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
+            RadialGradient(colors: [Theme.accent.opacity(0.09), .clear], center: .topLeading, startRadius: 20, endRadius: 900)
+                .ignoresSafeArea()
             VStack(alignment: .leading, spacing: 14) {
                 leagueRow
                 seasonRow
@@ -182,7 +184,7 @@ struct BrowseView: View {
                 }
             }
             .padding(.horizontal, 60)
-            .padding(.top, 30)
+            .padding(.vertical, 36)
         }
         .task { await model.loadSeasons() }
         .fullScreenCover(item: $playback) { PlayerView(clips: $0.clips, startIndex: $0.start).ignoresSafeArea() }
@@ -195,8 +197,9 @@ struct BrowseView: View {
     private var leagueRow: some View {
         HStack(spacing: 24) {
             ForEach(League.all) { l in
-                Button(l.name) { if model.league != l { model.league = l } }
-                    .foregroundStyle(model.league == l ? Theme.accent : .primary)
+                Button { if model.league != l { model.league = l } } label: {
+                    SelectionLabel(l.name, selected: model.league == l)
+                }
                     .accessibilityIdentifier("league.\(l.id)")
             }
             Spacer()
@@ -217,11 +220,12 @@ struct BrowseView: View {
 
     private var weekRail: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Week").font(.caption).foregroundStyle(Theme.secondaryText)
-            Button("All weeks") { model.allWeeks = true }
-                .foregroundStyle(model.allWeeks ? Theme.accent : .primary)
+            Text("Week").font(.headline).foregroundStyle(.primary)
+            Button { model.allWeeks = true } label: {
+                SelectionLabel("All weeks", selected: model.allWeeks)
+            }
                 .accessibilityIdentifier("week.all")
-            ScrollView {
+            ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(model.weeks) { w in
                         Button {
@@ -230,32 +234,53 @@ struct BrowseView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Text(w.weekName ?? "Week \(w.round ?? 0)")
+                                Spacer(minLength: 4)
+                                if !model.allWeeks && model.round == w.round {
+                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
+                                }
                                 if w.currentWeekForFixture == true {
                                     Circle().fill(Theme.accent).frame(width: 8, height: 8)
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .foregroundStyle(!model.allWeeks && model.round == w.round ? Theme.accent : .primary)
+                        .foregroundStyle(.primary)
                         .accessibilityIdentifier("week.\(w.round ?? 0)")
                     }
                 }
             }
         }
-        .frame(width: 220)
+        .padding(12)
+        .frame(width: 240)
+        .background(Theme.card.opacity(0.62), in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Theme.hairline))
         .buttonStyle(.bordered).font(.callout).focusSection()
     }
 
     private var modeRow: some View {
         HStack(spacing: 16) {
             ForEach(Mode.allCases) { m in
-                Button(m.label) { model.mode = m }
-                    .foregroundStyle(model.mode == m ? Theme.accent : .primary)
+                Button { model.mode = m } label: {
+                    SelectionLabel(m.label, selected: model.mode == m)
+                }
                     .accessibilityIdentifier("mode.\(m.rawValue)")
             }
             if model.league.usesHdToggle {
-                Toggle("HD", isOn: $model.hd)
-                    .tint(Theme.accent)
-                    .accessibilityIdentifier("hd.toggle")
+                HStack(spacing: 10) {
+                    Label("HD", systemImage: "sparkles.tv")
+                    ZStack {
+                        Toggle("HD", isOn: $model.hd).labelsHidden()
+                        Text(model.hd ? "On" : "Off")
+                            .font(.caption).bold()
+                            .foregroundStyle(.black.opacity(0.72))
+                            .allowsHitTesting(false)
+                    }
+                    .frame(width: 170)
+                }
+                .tint(Theme.accent)
+                .accessibilityElement(children: .combine)
+                .accessibilityValue(model.hd ? "On" : "Off")
+                .accessibilityIdentifier("hd.toggle")
             }
             Spacer()
         }
@@ -277,11 +302,13 @@ struct BrowseView: View {
                 }
                 .disabled(model.teams.isEmpty)
                 .accessibilityIdentifier("team.button")
-                Button("Matches") { model.teamGoals = false }
-                    .foregroundStyle(model.teamGoals ? .primary : Theme.accent)
+                Button { model.teamGoals = false } label: {
+                    SelectionLabel("Matches", selected: !model.teamGoals)
+                }
                     .accessibilityIdentifier("sub.matches")
-                Button("Goals") { model.teamGoals = true }
-                    .foregroundStyle(model.teamGoals ? Theme.accent : .primary)
+                Button { model.teamGoals = true } label: {
+                    SelectionLabel("Goals", selected: model.teamGoals)
+                }
                     .accessibilityIdentifier("sub.goals")
                 if model.teamGoals, let t = model.team {
                     Button { model.onlyTeamGoals.toggle() } label: {
@@ -334,15 +361,13 @@ struct BrowseView: View {
 
     @ViewBuilder private var content: some View {
         if let err = model.error {
-            VStack(spacing: 20) {
-                Text(err).foregroundStyle(Theme.secondaryText)
-                Button("Retry") { model.retry() }.buttonStyle(.bordered)
-            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            StatePanel(icon: "exclamationmark.arrow.triangle.2.circlepath", title: "Couldn’t load highlights", detail: err) {
+                Button("Retry") { model.retry() }.buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.black)
+            }
         } else if let (done, total) = model.seasonProgress, model.mode == .team || model.allWeeks {
-            VStack(spacing: 20) {
-                ProgressView(value: Double(done), total: Double(max(total, 1))).tint(Theme.accent).frame(width: 500)
-                Text("Loading season… \(done)/\(total)").foregroundStyle(Theme.secondaryText)
-            }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            StatePanel(icon: "rectangle.stack.badge.play", title: "Loading season… \(done)/\(total)", detail: "Gathering every published match in this season.") {
+                ProgressView(value: Double(done), total: Double(max(total, 1))).tint(Theme.accent).frame(width: 520)
+            }
         } else if model.loading && model.mode != .team {
             skeleton
         } else if model.mode == .team && model.team == nil {
@@ -357,15 +382,23 @@ struct BrowseView: View {
     }
 
     private func empty(_ text: String) -> some View {
-        Text(text).foregroundStyle(Theme.secondaryText).frame(maxWidth: .infinity, maxHeight: .infinity)
+        StatePanel(icon: "play.rectangle.on.rectangle", title: text, detail: "Try another week, season, or view.") { EmptyView() }
             .accessibilityIdentifier("empty")
     }
 
     private var skeleton: some View {
-        LazyVGrid(columns: columns, spacing: 50) {
-            ForEach(0..<6, id: \.self) { _ in
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .fill(Theme.card).aspectRatio(16 / 11, contentMode: .fit)
+        VStack(alignment: .leading, spacing: 24) {
+            HStack(spacing: 14) {
+                ProgressView().tint(Theme.accent)
+                Text("Loading highlights…").font(.headline)
+                Text("This usually takes a moment.").font(.callout).foregroundStyle(Theme.secondaryText)
+            }
+            LazyVGrid(columns: columns, spacing: 50) {
+                ForEach(0..<6, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                        .fill(Theme.card).aspectRatio(16 / 11, contentMode: .fit)
+                        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Theme.hairline))
+                }
             }
         }
         .padding(.vertical, 40)
@@ -384,12 +417,12 @@ struct BrowseView: View {
                     if headers {
                         HStack(spacing: 12) {
                             Text(model.weekName(r))
-                                .font(.headline)
-                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .font(.title3).bold()
+                                .padding(.horizontal, 14).padding(.vertical, 7)
                                 .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                                 .foregroundStyle(.black)
                             Text("\(ms.count) \(ms.count == 1 ? "match" : "matches")")
-                                .font(.callout).foregroundStyle(Theme.secondaryText)
+                                .font(.headline).foregroundStyle(Theme.secondaryText)
                         }
                     }
                     LazyVGrid(columns: columns, spacing: 50) {
@@ -449,8 +482,11 @@ struct PickerSheet<Item: Identifiable & Hashable, Label: View>: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 30) {
-                Text(title).font(.title2).bold()
-                ScrollView {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title).font(.title).bold()
+                    Text("\(items.count) options").font(.headline).foregroundStyle(Theme.secondaryText)
+                }
+                ScrollView(showsIndicators: false) {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: columns), spacing: 16) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                             Button { onSelect(item); dismiss() } label: {
@@ -459,15 +495,61 @@ struct PickerSheet<Item: Identifiable & Hashable, Label: View>: View {
                                     Spacer()
                                     if item.id == selected { Image(systemName: "checkmark").foregroundStyle(Theme.accent) }
                                 }
+                                .padding(.horizontal, 8)
                                 .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
+                            .tint(item.id == selected ? Theme.accent : Theme.raised)
                             .accessibilityIdentifier("picker.row.\(i)")
                         }
                     }
                 }
             }
-            .padding(60)
+            .padding(72)
+        }
+    }
+}
+
+/// A consistent, readable destination for loading, empty, and failure states.
+struct StatePanel<Action: View>: View {
+    let icon: String
+    let title: String
+    let detail: String
+    @ViewBuilder let action: () -> Action
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: icon)
+                .font(.system(size: 54, weight: .medium))
+                .foregroundStyle(Theme.accent)
+            Text(title).font(.title2).bold().multilineTextAlignment(.center)
+            Text(detail).font(.headline).foregroundStyle(Theme.secondaryText).multilineTextAlignment(.center)
+            action()
+        }
+        .padding(44)
+        .frame(maxWidth: 760)
+        .background(Theme.card.opacity(0.78), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 28, style: .continuous).stroke(Theme.hairline))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Persistent selection marker plus native foreground contrast when the control gains focus.
+struct SelectionLabel: View {
+    let title: String
+    let selected: Bool
+
+    init(_ title: String, selected: Bool) {
+        self.title = title
+        self.selected = selected
+    }
+
+    var body: some View {
+        VStack(spacing: 5) {
+            Text(title).foregroundStyle(.primary)
+            Capsule()
+                .fill(selected ? Theme.accent : .clear)
+                .frame(height: 3)
         }
     }
 }
@@ -515,6 +597,7 @@ struct GoalCard: View {
             .padding(16).background(Theme.card)
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Theme.hairline))
     }
     private var score: some View {
         (Text("\(row.home)").foregroundColor(row.side == .home ? Theme.accent : .primary)
@@ -529,7 +612,7 @@ struct MatchCard: View {
     var subtitle: String? = nil
 
     private static let df: DateFormatter = {
-        let f = DateFormatter(); f.dateStyle = .short; f.timeStyle = .short; return f
+        let f = DateFormatter(); f.dateFormat = "MMM d"; return f
     }()
 
     var body: some View {
@@ -549,21 +632,37 @@ struct MatchCard: View {
                         .background(Theme.accent, in: Capsule()).foregroundStyle(.black).padding(12)
                 }
             }
-            HStack(spacing: 14) {
-                logo(match.homeTeam)
-                Text("\(Match.scoreText(match.homeTeam)) - \(Match.scoreText(match.awayTeam))")
-                    .font(.title3).bold().monospacedDigit()
-                logo(match.awayTeam)
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    if let s = subtitle { Text(s).font(.caption).bold().foregroundStyle(Theme.accent) }
-                    if let d = match.date { Text(Self.df.string(from: d)).font(.caption).foregroundStyle(Theme.secondaryText) }
+            .overlay(alignment: .topLeading) {
+                if let subtitle {
+                    Text(subtitle).font(.caption).bold()
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                        .background(.black.opacity(0.76), in: Capsule())
+                        .foregroundStyle(Theme.accent).padding(12)
                 }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 14) {
+                    logo(match.homeTeam)
+                    Text("\(Match.scoreText(match.homeTeam)) – \(Match.scoreText(match.awayTeam))")
+                        .font(.title3).bold().monospacedDigit()
+                        .fixedSize()
+                    logo(match.awayTeam)
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 2) {
+                        if let d = match.date {
+                            Text(Self.df.string(from: d)).font(.caption).foregroundStyle(Theme.secondaryText)
+                                .lineLimit(1).minimumScaleFactor(0.75)
+                        }
+                    }
+                }
+                Text("\(match.homeTeam?.name ?? "?") · \(match.awayTeam?.name ?? "?")")
+                    .font(.caption).foregroundStyle(Theme.secondaryText).lineLimit(1).minimumScaleFactor(0.75)
             }
             .padding(16)
             .background(Theme.card)
         }
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Theme.hairline))
     }
 
     private func logo(_ t: Team?) -> some View {

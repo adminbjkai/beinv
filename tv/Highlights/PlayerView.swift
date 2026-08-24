@@ -148,7 +148,7 @@ final class ClipListController: UITableViewController {
         sections = out.map { (week: $0.0, items: $0.1.map { (index: $0.0, clip: $0.1) }) }
         super.init(style: .plain)
         title = "Clips"
-        preferredContentSize = CGSize(width: 1920, height: 520)
+        preferredContentSize = CGSize(width: 1920, height: 610)
     }
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
@@ -159,9 +159,9 @@ final class ClipListController: UITableViewController {
         tableView.remembersLastFocusedIndexPath = true
         tableView.accessibilityIdentifier = "player.clips"
         tableView.register(ClipCell.self, forCellReuseIdentifier: "clip")
-        tableView.rowHeight = 72
-        tableView.sectionHeaderHeight = 44
-        tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 8, right: 0)
+        tableView.rowHeight = 84
+        tableView.sectionHeaderHeight = 48
+        tableView.contentInset = UIEdgeInsets(top: 10, left: 0, bottom: 14, right: 0)
         cancellable = coordinator.$index.receive(on: RunLoop.main).sink { [weak self] _ in self?.tableView.reloadData() }
     }
 
@@ -202,6 +202,7 @@ final class ClipListController: UITableViewController {
         let item = sections[ip.section].items[ip.row]
         cell.configure(item.clip, current: item.index == coordinator.index)
         cell.accessibilityIdentifier = "clip.\(item.index)"
+        cell.accessibilityLabel = "\(item.clip.canonicalTitle), \(item.index == coordinator.index ? "Now playing" : "Clip \(item.index + 1) of \(coordinator.clips.count)")"
         return cell
     }
 
@@ -223,7 +224,7 @@ final class ClipCell: UITableViewCell {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         backgroundColor = .clear
         focusStyle = .custom
-        card.layer.cornerRadius = 14; card.layer.borderWidth = 0
+        card.layer.cornerRadius = 18; card.layer.borderWidth = 0
         contentView.addSubview(card); card.translatesAutoresizingMaskIntoConstraints = false
         minute.font = .boldSystemFont(ofSize: 28); minute.textAlignment = .right
         scorer.font = .boldSystemFont(ofSize: 28)
@@ -263,13 +264,17 @@ final class ClipCell: UITableViewCell {
 
     private func applyStyle() {
         let fg: UIColor = current ? .black : .white
-        card.backgroundColor = current ? UIColor(Theme.accent) : UIColor(Theme.background).withAlphaComponent(0.78)
+        card.backgroundColor = current ? UIColor(Theme.accent) : UIColor(Theme.card).withAlphaComponent(0.90)
         minute.textColor = current ? .black : UIColor(Theme.accent)
         scorer.textColor = fg; score.textColor = fg
         scoreline.textColor = current ? UIColor.black.withAlphaComponent(0.7) : UIColor(Theme.secondaryText)
         card.layer.borderColor = UIColor.white.cgColor
         card.layer.borderWidth = isFocused ? 4 : 0
         transform = isFocused ? CGAffineTransform(scaleX: 1.02, y: 1.02) : .identity
+        card.layer.shadowColor = UIColor.black.cgColor
+        card.layer.shadowOpacity = isFocused ? 0.45 : 0
+        card.layer.shadowRadius = isFocused ? 16 : 0
+        card.layer.shadowOffset = CGSize(width: 0, height: 8)
     }
 
     override func didUpdateFocus(in context: UIFocusUpdateContext, with coordinator: UIFocusAnimationCoordinator) {
@@ -304,28 +309,38 @@ struct ClipsView: View {
         ZStack {
             Theme.background.ignoresSafeArea()
             VStack(alignment: .leading, spacing: 24) {
-                Text(match.title).font(.title2).bold()
-                ScrollView {
-                    LazyVStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(match.title).font(.title).bold()
+                    Text("Choose a starting point").font(.headline).foregroundStyle(Theme.secondaryText)
+                }
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 16) {
                         ForEach(Array(match.playlist.enumerated()), id: \.element.id) { i, c in
                             Button { start = StartAt(id: i) } label: {
                                 HStack(spacing: 16) {
-                                    Circle().fill(c.isGoal ? Theme.accent : Color.clear)
-                                        .overlay(Circle().stroke(Theme.secondaryText, lineWidth: c.isGoal ? 0 : 2))
-                                        .frame(width: 16, height: 16)
-                                    Text(c.title)
+                                    AsyncImage(url: c.thumbnail ?? match.thumbnailURL) { $0.resizable().aspectRatio(contentMode: .fill) } placeholder: { Theme.raised }
+                                        .frame(width: 150, height: 84).clipped()
+                                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text(c.title).font(.title3).bold().lineLimit(1)
+                                        Text(c.isFull ? "Full highlight" : c.subtitle).font(.headline).foregroundStyle(Theme.secondaryText).lineLimit(1)
+                                    }
                                     Spacer()
+                                    Image(systemName: "play.fill").foregroundStyle(Theme.accent)
                                 }
-                                .padding(.horizontal, 24)
+                                .padding(14)
+                                .background(Theme.card, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous).stroke(Theme.hairline))
                             }
+                            .buttonStyle(.card)
                         }
                         if match.events.isEmpty {
-                            Text("No individual clips for this match.").foregroundStyle(Theme.secondaryText)
+                            Text("No individual clips for this match.").font(.headline).foregroundStyle(Theme.secondaryText).padding(.top, 10)
                         }
                     }
                 }
             }
-            .padding(60)
+            .padding(72)
         }
         .fullScreenCover(item: $start) { PlayerView(clips: match.playlist, startIndex: $0.id).ignoresSafeArea() }
     }

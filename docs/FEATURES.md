@@ -1,25 +1,26 @@
-# Feature spec (v2.7) — applies to all clients
+# Feature spec (v2.8) — applies to all clients
 
 All three clients (web, Android, Apple TV) implement the same feature set with platform-native UI. Data comes only from the endpoints in [UPSTREAM_API.md](UPSTREAM_API.md).
 
 ### Client status (2026-08-24)
 
-| Client | v2.7 features | Built / run |
+| Client | v2.8 state | Built / run |
 |---|---|---|
-| **Web + Rust server** | v2.7 (Premier HD, All weeks, La Liga 2025/26) is live on [beinv.bjk.ai](https://beinv.bjk.ai/). **v2.7.1** in this checkout (HD last-used from storage, week-rail scroll, `[` / `]` week keys) is **not deployed** yet. | v2.7 live · v2.7.1 local |
-| **Android** | Week rail, week headers, HD default, La Liga via remux host, remux warm. | **Verified** on Pixel_9 (HD, 1080p remux, All weeks, La Liga 25/26 + 26/27, Goals, PiP) |
-| **tvOS** | `weekRail`, week headers, HD `Toggle`, La Liga via remux host, remux warm. | **Verified** on Living Room Apple TV 4K (install + `HighlightsUITests`) |
+| **Web + Rust server** | v2.7 product behavior is live on [beinv.bjk.ai](https://beinv.bjk.ai/). v2.8 adds the responsive UI/player, structured states, semantics and reduced-motion pass in this checkout; it is not deployed yet. | **Verified locally** in Chromium at 1440, 390 and 320 px with live playback and injected error/retry paths |
+| **Android** | v2.8 adds full-name phone league chips, adaptive grids, scroll restoration, structured states, accessibility semantics, playback Retry and monochrome launcher support. | **Verified** on Pixel_9 across all leagues/modes, portrait + landscape drawer, clip jump and PiP; build + lint clean |
+| **tvOS** | v2.8 adds compact HD control, persistent focus-safe selection markers, contained week rail, richer cards/states/pickers and more legible native clip lists. | **Verified** on Apple TV 4K simulator (4 unit + 3 XCUIRemote tests); v2.7.1 is the last physical-device install |
 
-Native is a compile-and-verify job, not a green-field port. Do not re-implement matching/remux on device.
+Native is an established implementation, not a green-field port. Do not re-implement matching/remux on device.
 
 ## 0. Parity rules (every client, same structure and wording)
 Top-to-bottom layout, identical labels:
 1. **League** switch: `Trendyol Süper Lig` | `İngiltere Premier Lig` | `İspanya La Liga` (exact names).
 2. **Season** picker (label "Season") — always visible and selectable in every mode; changing it resets the week view to **All weeks**.
-3. **Week** rail (label "Week") — visible in Highlights and Goals; hidden only in By team. First item is **All weeks** (default): every published match of the season, grouped by week. Picking a week filters to that round. Desktop/tvOS: vertical list on the left. Phone: horizontal chips.
-4. **Mode** switch: `Highlights` | `Goals` | `By team`.
-5. Mode-specific row:
+3. **Mode** switch: `Highlights` | `Goals` | `By team`.
+4. Mode-specific controls:
+   - Trendyol Süper Lig / İngiltere Premier Lig → **HD** toggle.
    - By team → **Team** picker (label "Team", logo + name, A–Z), then a `Matches` | `Goals` sub-switch, and — when Goals is active — a toggle `Only <Team> goals` (default ON).
+5. **Week** rail (label "Week") — visible in Highlights and Goals; hidden only in By team. First item is **All weeks** (default): every published match of the season, grouped by week. Picking a week filters to that round. Desktop/tvOS: vertical list on the left. Phone: horizontal chips.
 6. Content area.
 
 Every selection change must be reflected immediately and persist (see §1). No mode may dead-end: Back/Esc returns to the previous level.
@@ -66,6 +67,9 @@ Design goal: the playlist reads like the season in order, the user always knows 
 - Team logos, score, date (local tz), goal count badge on cards. A score upstream did not report
   renders as an en dash `–` on every client — never as `0`, which is indistinguishable from a real
   goalless draw.
+- Platform-adaptive navigation and grids: phone controls may scroll horizontally without truncating exact labels; wide layouts use their available space without changing information order.
+- Touch/focus targets, selected/current state, loading/progress, error/Retry and player navigation expose meaningful platform semantics. tvOS focus uses native high-contrast foregrounds plus a persistent selection marker.
+- Web respects reduced-motion preferences. At phone widths its player controls sit below the unobscured video; at desktop widths they remain auto-hiding chrome and leave room for the ≤35% Clips drawer.
 - Focus/hover/pressed states; no purple anywhere (charcoal `#0B0F0E`, emerald `#19C37D`).
 
 ## Out of scope (for now)

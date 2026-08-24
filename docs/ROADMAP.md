@@ -45,6 +45,12 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
 ## v2.7.1 — native parity polish ✅
 - Week section headers on Android/tvOS; web HD remembered; week-rail scroll + `[`/`]`; remux warm from native; Apple TV device install + UI tests.
 
+## v2.8 — interface refinement ✅
+- Web: responsive navigation and player chrome, phone controls below the video, clearer cards/states, stronger semantics and reduced-motion support; real-browser validation down to 320 px including live playback and failure recovery.
+- Android: full-name phone league chips, adaptive grids, preserved By-team newest-first ordering, auto-scrolling week rail, logo fallbacks, structured states, accessibility semantics, playback Retry and themed launcher support; Pixel_9 phone/tablet/landscape/PiP validation.
+- tvOS: compact HD control, focus-safe selection markers, contained week rail, richer cards/pickers/states and more legible native clip lists; Apple TV 4K simulator build plus 4 unit and 3 XCUIRemote tests.
+- Cross-client data, persistence, labels, playlist ordering and charcoal/emerald identity remain unchanged. See [reports/ui-v2.8.md](reports/ui-v2.8.md).
+
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.
 - Search (team / player name in event descriptions).

@@ -16,6 +16,7 @@ const stored = (): Stored => { try { return JSON.parse(localStorage.getItem(LS) 
 const isMode = (x: unknown): x is Mode => MODES.some(([m]) => m === x)
 const HD_LEAGUES = new Set(['super-lig', 'ingiltere-premier-ligi'])
 const EMPTY_WEEKS: Week[] = []
+const motionBehavior = (): ScrollBehavior => window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
 /** FEATURES §1: default week is all-weeks for Highlights/Goals; By team has no week. */
 const parseRound = (raw: string | null | undefined): RoundSel | undefined => {
   if (raw == null || raw === '') return undefined
@@ -123,17 +124,17 @@ export default function App() {
   }
   const openMatch = (m: Match) => {
     const items = matchPlaylist(m, league, seasonId!, clipMeta(m), useHd)
-    if (items.length) { setPlaying({ items, index: 0, matchId: m.id }); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+    if (items.length) { setPlaying({ items, index: 0, matchId: m.id }); window.scrollTo({ top: 0, behavior: motionBehavior() }) }
   }
   // goals grouped by match with running score; By team honours "Only <Team> goals"
   const groups = useMemo(() => goalsView ? goalGroups(matches, teamMode && onlyTeam ? team : undefined) : [], [goalsView, matches, teamMode, onlyTeam, team])
   // §2b order: week asc → kick-off asc → minute asc, over exactly the visible rows
   const ordered = useMemo(() => playlistOrder(groups), [groups])
   const allGoals = () => ordered.flatMap(g => g.rows.map(r => clipItem(g.m, r.event, { league, season: seasonId!, round: g.m.round }, clipMeta(g.m)(r.event))))
-  const playAll = () => { const items = allGoals(); if (items.length) { setPlaying({ items, index: 0 }); window.scrollTo({ top: 0, behavior: 'smooth' }) } }
+  const playAll = () => { const items = allGoals(); if (items.length) { setPlaying({ items, index: 0 }); window.scrollTo({ top: 0, behavior: motionBehavior() }) } }
   const playGoal = (e: Event) => {
     const items = allGoals(); const index = Math.max(0, items.findIndex(i => i.event?.id === e.id))
-    setPlaying({ items, index }); window.scrollTo({ top: 0, behavior: 'smooth' })
+    setPlaying({ items, index }); window.scrollTo({ top: 0, behavior: motionBehavior() })
   }
 
   // open match from URL once data is loaded; keep URL + localStorage in sync afterwards
@@ -198,7 +199,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [playing, stepWeek])
 
-  const seg = (on: boolean) => `rounded-lg px-3 py-1.5 text-sm font-semibold transition ${on ? 'bg-accent text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`
+  const seg = (on: boolean) => `min-h-10 rounded-lg px-3 py-1.5 text-sm font-semibold transition ${on ? 'bg-accent text-black shadow-[0_8px_24px_-12px_rgba(25,195,125,.9)]' : 'text-white/65 hover:bg-white/[.06] hover:text-white'}`
   const current = playing?.items[playing.index]
   const selectedTeam = teams.find(t => t.name === team)
   const emptyMsg = teamMode
@@ -211,59 +212,66 @@ export default function App() {
     : 'No goal clips published yet.'
 
   return (
-    <div className="mx-auto max-w-7xl overflow-x-hidden px-4 pb-24 pt-6 md:px-8">
-      <header className="mb-6 flex flex-wrap items-center gap-3">
-        <h1 className="mr-auto text-2xl font-extrabold tracking-tight">
-          <span className="bg-gradient-to-r from-accent to-accent-2 bg-clip-text text-transparent">Highlights</span>
-        </h1>
-        <div className="glass flex w-full max-w-full overflow-x-auto rounded-xl p-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] sm:w-auto [&::-webkit-scrollbar]:hidden">
+    <div className="mx-auto max-w-7xl overflow-x-hidden px-4 pb-24 pt-5 md:px-8 md:pt-7">
+      <header className="mb-5 space-y-4 md:mb-6">
+        <div>
+          <div>
+            <p className="mb-1 text-[11px] font-bold uppercase tracking-[.2em] text-accent/75">Matchday, distilled</p>
+            <h1 className="text-3xl font-black tracking-[-.04em] sm:text-4xl">
+              <span className="bg-gradient-to-r from-accent via-emerald-300 to-accent-2 bg-clip-text text-transparent">Highlights</span>
+            </h1>
+          </div>
+        </div>
+        <div className="edge-scroll glass control-surface flex w-full max-w-full overflow-x-auto rounded-2xl p-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="League">
           {(leagues.data ?? []).map(l => (
             <button key={l.id} onClick={() => { setLeague(l.id); setTeam(undefined); setSeasonId(undefined); setRound('all') }}
               aria-pressed={league === l.id} aria-label={l.name}
-              className={`min-h-11 shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition sm:px-4 ${league === l.id ? 'bg-white text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`}>
+              className={`min-h-11 shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition sm:flex-1 sm:px-4 ${league === l.id ? 'bg-white text-black shadow-[0_10px_30px_-15px_rgba(255,255,255,.65)]' : 'text-white/60 hover:bg-white/[.06] hover:text-white'}`}>
               {l.name}
             </button>
           ))}
         </div>
-        <label className="glass flex items-center rounded-xl pl-3 text-sm"><span className="mr-2 text-white/50">Season</span>
-        <select value={seasonId ?? ''} aria-label="Season"
-          onChange={e => { const s = seasons.data?.find(x => x.id === +e.target.value); setSeasonId(s?.id); setRound('all') }}
-          className="bg-transparent py-2 text-sm font-medium outline-none">
-          {(seasons.data ?? []).map(s => <option key={s.id} value={s.id} className="bg-panel">{s.name}</option>)}
-        </select></label>
+        <label className="glass control-surface flex min-h-11 w-fit max-w-full items-center rounded-xl pl-3 text-sm">
+          <span className="mr-2 text-white/45">Season</span>
+          <select value={seasonId ?? ''} aria-label="Season"
+            onChange={e => { const s = seasons.data?.find(x => x.id === +e.target.value); setSeasonId(s?.id); setRound('all') }}
+            className="bg-transparent py-2 text-sm font-semibold outline-none">
+            {(seasons.data ?? []).map(s => <option key={s.id} value={s.id} className="bg-panel">{s.name}</option>)}
+          </select>
+        </label>
       </header>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="glass flex rounded-xl p-1" role="tablist" aria-label="View">
+      <div className="mb-6 flex flex-wrap items-center gap-2.5 sm:gap-3">
+        <div className="glass control-surface flex rounded-xl p-1" role="tablist" aria-label="View">
           {MODES.map(([m, label]) => <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={seg(mode === m)}>{label}</button>)}
         </div>
         {hdLeague && (
           <button role="switch" aria-checked={hd} aria-label="HD quality" onClick={() => setHd(v => !v)}
-            className={`glass flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition hover:border-white/20 ${hd ? 'text-white' : 'text-white/60'}`}>
+            className={`glass control-surface flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition hover:border-white/20 ${hd ? 'text-white' : 'text-white/55'}`}>
             <span className={`relative h-4 w-7 rounded-full transition ${hd ? 'bg-accent' : 'bg-white/20'}`}>
-              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${hd ? 'left-3.5' : 'left-0.5'}`} />
+              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white shadow transition ${hd ? 'left-3.5' : 'left-0.5'}`} />
             </span>
             HD
           </button>
         )}
         {teamMode && (
           <>
-            <div className="glass flex items-center gap-2 rounded-xl pl-3 text-sm">
-              <span className="text-white/50">Team</span>
+            <div className="glass control-surface flex min-h-11 max-w-full items-center gap-2 rounded-xl pl-3 text-sm">
+              <span className="text-white/45">Team</span>
               {selectedTeam && <img src={selectedTeam.logo} alt="" className="h-6 w-6 object-contain" />}
               <select value={team ?? ''} onChange={e => setTeam(e.target.value)} disabled={!teams.length} aria-label="Team"
-                className="bg-transparent py-2 text-sm font-medium outline-none disabled:opacity-50">
+                className="min-w-0 max-w-[14rem] bg-transparent py-2 text-sm font-medium outline-none disabled:opacity-50">
                 {!teams.length && <option className="bg-panel">{all.isLoading ? 'Loading season…' : 'No teams'}</option>}
                 {teams.map(t => <option key={t.name} value={t.name} className="bg-panel">{t.name}</option>)}
               </select>
             </div>
-            <div className="glass flex rounded-xl p-1">
-              <button onClick={() => setTeamGoals(false)} className={seg(!teamGoals)}>Matches</button>
-              <button onClick={() => setTeamGoals(true)} className={seg(teamGoals)}>Goals</button>
+            <div className="glass control-surface flex rounded-xl p-1" role="group" aria-label="Team content">
+              <button onClick={() => setTeamGoals(false)} aria-pressed={!teamGoals} className={seg(!teamGoals)}>Matches</button>
+              <button onClick={() => setTeamGoals(true)} aria-pressed={teamGoals} className={seg(teamGoals)}>Goals</button>
             </div>
             {teamGoals && (
               <button role="switch" aria-checked={onlyTeam} onClick={() => setOnlyTeam(v => !v)}
-                className={`glass flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition hover:border-white/20 ${onlyTeam ? 'text-white' : 'text-white/60'}`}>
+                className={`glass control-surface flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition hover:border-white/20 ${onlyTeam ? 'text-white' : 'text-white/55'}`}>
                 <span className={`relative h-4 w-7 rounded-full transition ${onlyTeam ? 'bg-accent' : 'bg-white/20'}`}>
                   <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${onlyTeam ? 'left-3.5' : 'left-0.5'}`} />
                 </span>
@@ -275,12 +283,12 @@ export default function App() {
       </div>
 
       {playing && current && (
-        <section className="fade-up mb-10">
+        <section className="fade-up mb-10" aria-label="Player">
           <Player items={playing.items} index={playing.index} autoNext={autoNext} onAutoNext={setAutoNext} initialClips={init.clips}
             onIndex={i => setPlaying(p => p && { ...p, index: i })} onEnd={() => setPlaying(undefined)} />
-          <div className="mt-3 flex items-center gap-2 text-xs text-white/60">
-            <span>{playing.matchId ? 'Match playlist' : 'Playing all goals'} · {playing.items.length} clips · n / p to skip · c for the drawer</span>
-            <button onClick={() => setPlaying(undefined)} className="ml-auto rounded-lg px-2 py-1 text-white/50 transition hover:bg-white/5 hover:text-white">Close ✕</button>
+          <div className="mt-3 flex items-center gap-3 text-xs text-white/55">
+            <span><strong className="font-semibold text-white/80">{playing.matchId ? 'Match playlist' : 'Playing all goals'}</strong> · {playing.items.length} clips <span className="hidden sm:inline">· n / p to skip · c for the drawer</span></span>
+            <button onClick={() => setPlaying(undefined)} className="ml-auto min-h-10 shrink-0 rounded-lg px-3 text-white/55 transition hover:bg-white/[.06] hover:text-white" aria-label="Close player">Close <span aria-hidden="true">✕</span></button>
           </div>
           <div className="mt-3">
             <ClipList items={playing.items} index={playing.index} onIndex={i => setPlaying(p => p && { ...p, index: i })} chips />
@@ -288,7 +296,7 @@ export default function App() {
         </section>
       )}
 
-      <div className={`flex items-start gap-6 ${teamMode ? '' : ''}`}>
+      <main className="flex items-start gap-6" aria-busy={list.isLoading}>
         {!teamMode && (
           <WeekRail weeks={weeks} round={round ?? 'all'} onPick={setRound} className="hidden md:flex" />
         )}
@@ -296,25 +304,19 @@ export default function App() {
           {!teamMode && (
             <WeekRail weeks={weeks} round={round ?? 'all'} onPick={setRound} className="mb-5 flex md:hidden" horizontal />
           )}
-          {list.isLoading && !list.data && (
-            <div>
-              {(teamMode || allWeeks) && <p className="mb-4 text-sm text-white/60"><span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-accent align-middle" />Loading the whole season ({weeks.length} weeks)…</p>}
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => <div key={i} className="glass aspect-[4/3.6] animate-pulse rounded-2xl" />)}
-              </div>
-            </div>
-          )}
+          {list.isLoading && !list.data && <LoadingCards wholeSeason={teamMode || allWeeks} weeks={weeks.length} />}
           {list.isError && (
-            <div className="glass fade-up flex flex-wrap items-center gap-3 rounded-2xl p-6 text-red-300">
-              <span>Could not load matches. {String(list.error)}</span>
-              <button onClick={() => list.refetch()} className="ml-auto rounded-full bg-accent px-4 py-1.5 text-sm font-semibold text-black transition hover:brightness-110">Retry</button>
+            <div className="state-panel glass fade-up flex flex-wrap items-center gap-4 rounded-2xl p-6" role="alert">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-400/10 text-red-300" aria-hidden="true">!</span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-white">Could not load matches</p>
+                <p className="mt-0.5 truncate text-xs text-red-200/60">{String(list.error)}</p>
+              </div>
+              <button onClick={() => list.refetch()} className="min-h-10 rounded-full bg-accent px-5 text-sm font-bold text-black transition hover:brightness-110">Retry</button>
             </div>
           )}
           {list.data && !goalsView && matches.length === 0 && (
-            <div className="glass fade-up rounded-2xl p-8 text-center text-white/60 sm:p-12">
-              {emptyMsg}
-              <p className="mt-2 text-sm text-white/40">They usually appear a few hours after kick-off.</p>
-            </div>
+            <EmptyState message={emptyMsg} detail="They usually appear a few hours after kick-off." />
           )}
           {list.data && goalsView && (
             <GoalsGrid groups={groups} label={showWeekLabels ? weekName : undefined} onPlay={playGoal}
@@ -325,8 +327,9 @@ export default function App() {
               {grouped.map(([r, ms]) => (
                 <section key={r} id={`week-${r}`} className="scroll-mt-20">
                   {showWeekLabels && (
-                    <h2 className="mb-4 flex items-baseline gap-3 text-lg font-bold tracking-tight">
-                      <span className="rounded-md bg-accent/90 px-2 py-0.5 text-sm font-semibold text-black">{weekName(r)}</span>
+                    <h2 className="mb-4 flex items-center gap-3 text-lg font-bold tracking-tight">
+                      <span className="h-5 w-1 rounded-full bg-accent shadow-[0_0_18px_rgba(25,195,125,.55)]" aria-hidden="true" />
+                      <span className="text-base font-bold text-white">{weekName(r)}</span>
                       <span className="text-sm font-medium text-white/45">{ms.length} {ms.length === 1 ? 'match' : 'matches'}</span>
                     </h2>
                   )}
@@ -338,11 +341,11 @@ export default function App() {
             </div>
           )}
         </div>
-      </div>
+      </main>
 
-      <details className="mt-16 text-xs text-white/40">
-        <summary className="cursor-pointer select-none py-2 text-white/50">Help &amp; shortcuts</summary>
-        <div className="mt-2 max-w-xl space-y-2 leading-relaxed">
+      <details className="glass control-surface mt-16 rounded-2xl text-xs text-white/45">
+        <summary className="cursor-pointer select-none rounded-2xl px-4 py-3 font-semibold text-white/55 transition hover:text-white">Help &amp; shortcuts</summary>
+        <div className="max-w-2xl space-y-2 px-4 pb-4 leading-relaxed">
           <p>Pick a league and season. Highlights open on every week at once — use the week list on the left (chips on a phone) to jump to one week, or All to see the season. Tap a match to play on this page.</p>
           <p><b className="text-white/60">HD</b> is on by default for Trendyol Süper Lig (official beIN SPORTS Türkiye YouTube özet) and Premier League (official NBC Sports). Goal clips stay on the standard feed. Turn HD off to use the beIN cut. New matchdays appear automatically.</p>
           <p><b className="text-white/60">İspanya La Liga</b> covers 2025/2026 and 2026/2027. Full-match highlights appear after each game; Goals mode stays empty until individual goal clips are published (same as Premier League).</p>
@@ -358,14 +361,14 @@ function WeekRail({ weeks, round, onPick, className = '', horizontal = false }: 
 }) {
   const selected = useRef<HTMLButtonElement>(null)
   useEffect(() => {
-    selected.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+    selected.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: motionBehavior() })
   }, [round])
   const chip = (on: boolean) =>
-    `shrink-0 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${on ? 'bg-accent text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`
+    `min-h-10 shrink-0 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${on ? 'bg-accent text-black shadow-[0_8px_24px_-12px_rgba(25,195,125,.9)]' : 'text-white/65 hover:bg-white/[.06] hover:text-white'}`
   return (
     <nav aria-label="Weeks" className={`${horizontal
-      ? 'glass w-full overflow-x-auto rounded-xl p-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
-      : 'glass sticky top-4 flex w-44 shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl p-2 max-h-[calc(100vh-6rem)]'
+      ? 'edge-scroll glass control-surface w-full overflow-x-auto rounded-xl p-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+      : 'glass control-surface sticky top-4 flex w-44 shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl p-2 max-h-[calc(100vh-6rem)]'
     } ${className}`}>
       {!horizontal && <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">Week</p>}
       <button type="button" ref={round === 'all' ? selected : undefined} aria-pressed={round === 'all'} onClick={() => onPick('all')} className={chip(round === 'all')}>
@@ -379,5 +382,42 @@ function WeekRail({ weeks, round, onPick, className = '', horizontal = false }: 
         </button>
       ))}
     </nav>
+  )
+}
+
+function LoadingCards({ wholeSeason, weeks }: { wholeSeason: boolean; weeks: number }) {
+  return (
+    <div role="status" aria-live="polite">
+      <p className="mb-4 flex items-center gap-2 text-sm font-medium text-white/60">
+        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/15 border-t-accent" aria-hidden="true" />
+        {wholeSeason ? `Loading the whole season (${weeks} weeks)…` : 'Loading highlights…'}
+      </p>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="glass control-surface overflow-hidden rounded-2xl">
+            <div className="skeleton-shimmer aspect-video bg-white/[.035]" />
+            <div className="flex items-center gap-3 p-4">
+              <div className="h-9 w-9 rounded-full bg-white/[.05]" />
+              <div className="h-3 flex-1 rounded-full bg-white/[.05]" />
+              <div className="h-7 w-12 rounded-lg bg-white/[.05]" />
+              <div className="h-3 flex-1 rounded-full bg-white/[.05]" />
+              <div className="h-9 w-9 rounded-full bg-white/[.05]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function EmptyState({ message, detail }: { message: string; detail?: string }) {
+  return (
+    <div className="state-panel glass fade-up rounded-2xl p-8 text-center sm:p-12" role="status">
+      <span className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-accent/10 text-accent" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m8 2 1.5 4.5L14 8l-4.5 1.5L8 14 6.5 9.5 2 8l4.5-1.5L8 2Z"/><path d="m17 12 1 3 3 1-3 1-1 3-1-3-3-1 3-1 1-3Z"/></svg>
+      </span>
+      <p className="font-semibold text-white/80">{message}</p>
+      {detail && <p className="mt-2 text-sm text-white/40">{detail}</p>}
+    </div>
   )
 }

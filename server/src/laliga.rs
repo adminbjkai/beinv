@@ -161,6 +161,7 @@ pub fn score_in_title(title: &str, hs: i64, aws: i64) -> bool {
 /// Longest matching highlight (landscape cuts run ~20–30 s longer than the vertical ones).
 /// When scores are known, prefer a title that carries that score so 2025/26 and 2026/27
 /// meetings of the same two clubs do not collide.
+#[cfg(test)]
 pub fn pick_best(cands: &[YtVid], home: &str, away: &str) -> Option<String> {
     pick_best_scored(cands, home, away, None, None)
 }

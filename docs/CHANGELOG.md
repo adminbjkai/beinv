@@ -1,5 +1,12 @@
 # Changelog
 
+## v2.8 — 2026-08-24
+- **Web**: reorganized the responsive shell without changing League → Season → Mode/Week behavior; refined match/goal cards and loading/empty/error states; added semantic status/alert/selection metadata and reduced-motion handling. Phone player controls now sit below the unobscured video in two compact rows; desktop retains auto-hiding chrome and the ≤35% Clips drawer. Browser-tested at 1440×1000, 390×844 and 320×780 with live playback, clip jump, keyboard/drawer flow, persistence, and injected list/player failures with successful Retry.
+- **Android**: full league names now remain readable in a scrollable phone rail; wide screens keep the segmented control. Week selection auto-scrolls, grids adapt to available width, All-weeks grouping stays chronological, and By-team matches retain newest-first order. Cards, logos, empty/error states, switches/dropdowns/week/clip rows and system bars received Material/accessibility polish. The player adds an explicit Retry surface. Added an API-33 monochrome launcher layer while preserving the v26 adaptive icon. Clean build/lint, Pixel_9 browse/player/landscape drawer/PiP validation.
+- **tvOS**: compact native HD control, persistent emerald selection markers with native focused contrast, contained week rail, short unclipped card dates, richer cards/pickers/state panels, and taller accessible native Clips rows. Added an XCUIRemote HD focus/action regression; 4 unit + 3 UI tests pass on the Apple TV 4K simulator.
+- **Repository hygiene**: applied the current Rust formatter and marked two match-selection convenience wrappers as test-only, keeping `cargo fmt --check` and `cargo clippy --all-targets` clean without changing server behavior.
+- Functional scope, exact parity labels, APIs, persistence, remux behavior, canonical playlist order/titles and charcoal/emerald identity are unchanged. Full evidence: [reports/ui-v2.8.md](reports/ui-v2.8.md).
+
 ## v2.7.1 — 2026-08-24
 - **Parity / convenience**: All-weeks cards are grouped under week section headers on Android and tvOS (same as web). Changing season on tvOS resets to All weeks. HD last-used state is restored on web when the URL does not set `hd`. Week rail scrolls the current selection into view; `[` / `]` steps weeks on web. Native clients ping `beinv.bjk.ai` in the background after a week/season loads so remuxes are warming before the first tap.
 - **tvOS**: Retry reloads All weeks (was only the single-week fetch). HD is a `Toggle`. UI tests tolerate the week rail in the focus path. `-reset` clears `allWeeks`.

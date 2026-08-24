@@ -103,6 +103,7 @@ pub fn date_token(iso: &str) -> Option<String> {
     Some(format!("{m}/{day}/{y}"))
 }
 
+#[cfg(test)]
 pub fn pick_best(cands: &[YtVid], home: &str, away: &str) -> Option<String> {
     pick_best_dated(cands, home, away, "")
 }

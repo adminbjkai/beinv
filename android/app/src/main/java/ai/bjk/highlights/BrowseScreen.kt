@@ -1,6 +1,7 @@
 package ai.bjk.highlights
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,7 +11,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,6 +30,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -165,7 +173,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(start = 16.dp, top = 12.dp, bottom = 8.dp)
                 )
-                Segmented(LEAGUES.map { it.name }, leagueIdx) { leagueIdx = it }
+                LeagueSelector(LEAGUES.map { it.name }, leagueIdx) { leagueIdx = it }
                 Row(
                     Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -174,6 +182,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                     Text("Season", color = TextGray, style = MaterialTheme.typography.labelLarge)
                     Dropdown(
                         label = season?.name ?: "Season",
+                        description = "Season",
                         items = seasonList.map { it.name ?: "?" },
                         modifier = Modifier.weight(1f),
                     ) { i ->
@@ -191,6 +200,10 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                     Text("HD", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                     Switch(
                         checked = hd, onCheckedChange = { hd = it },
+                        modifier = Modifier.semantics {
+                            contentDescription = "HD"
+                            stateDescription = if (hd) "On" else "Off"
+                        },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Background, checkedTrackColor = Emerald,
                             uncheckedThumbColor = TextGray, uncheckedTrackColor = Surface,
@@ -206,6 +219,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                         Text("Team", color = TextGray, style = MaterialTheme.typography.labelLarge)
                         Dropdown(
                             label = selectedTeam?.name ?: "Pick a team",
+                            description = "Team",
                             items = teams.map { it.name },
                             icons = teams.map { it.logo },
                             leadingIcon = selectedTeam?.logo,
@@ -223,6 +237,10 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                         )
                         Switch(
                             checked = onlyTeam, onCheckedChange = { onlyTeam = it; prefs.onlyTeam = it },
+                            modifier = Modifier.semantics {
+                                contentDescription = "Only ${selectedTeam?.name ?: "team"} goals"
+                                stateDescription = if (onlyTeam) "On" else "Off"
+                            },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Background, checkedTrackColor = Emerald,
                                 uncheckedThumbColor = TextGray, uncheckedTrackColor = Surface,
@@ -230,7 +248,8 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                         )
                     }
                 }
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.7f))
             }
         }
     ) { pad ->
@@ -262,6 +281,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                                 }
                                 Content(mine, goalsOnly = teamGoals, onOpen = { playMatch(it) }, onPlay = onPlay,
                                     title = t.name, goalFilter = filter,
+                                    groupByWeek = false,
                                     emptyMsg = "No highlights for ${t.name} this season yet.")
                             }
                         }
@@ -297,6 +317,7 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
                                         .map { Entry(weekName(it.round), it.round, it.match) }
                                     Content(entries, goalsOnly = mode == Mode.Goals, onOpen = { playMatch(it) },
                                         onPlay = onPlay, title = "Season",
+                                        groupByWeek = true,
                                         emptyMsg = "No highlights published for this season yet.")
                                 }
                             } else when (val m = matches) {
@@ -321,29 +342,29 @@ private fun Content(
     entries: List<Entry>, goalsOnly: Boolean, title: String,
     onOpen: (Entry) -> Unit, onPlay: (Playlist) -> Unit,
     goalFilter: (GoalRow) -> Boolean = { true },
+    groupByWeek: Boolean = false,
     emptyMsg: String = "No highlights published for this week yet.",
 ) {
     if (entries.isEmpty()) {
-        Centered { Text(emptyMsg, color = TextGray, textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp)) }
+        EmptyState(emptyMsg)
         return
     }
-    if (goalsOnly) GoalsView(entries, title, goalFilter, onPlay) else MatchGrid(entries, onOpen)
+    if (goalsOnly) GoalsView(entries, title, goalFilter, onPlay) else MatchGrid(entries, groupByWeek, onOpen)
 }
 
 @Composable
-private fun MatchGrid(entries: List<Entry>, onOpen: (Entry) -> Unit) {
-    val wide = LocalConfiguration.current.screenWidthDp > 600
-    val cols = if (wide) 3 else 2
+private fun MatchGrid(entries: List<Entry>, groupByWeek: Boolean, onOpen: (Entry) -> Unit) {
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val minCardWidth = if (screenWidth < 600) 160.dp else 220.dp
     val groups = remember(entries) { entries.groupBy { it.round }.toSortedMap() }
-    val headers = groups.size > 1
     LazyVerticalGrid(
-        columns = GridCells.Fixed(cols),
+        columns = GridCells.Adaptive(minCardWidth),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        groups.forEach { (round, es) ->
-            if (headers) {
+        if (groupByWeek) {
+            groups.forEach { (round, es) ->
                 item(key = "h$round", span = { GridItemSpan(maxLineSpan) }) {
                     val name = es.first().week ?: "Week $round"
                     Row(
@@ -368,8 +389,12 @@ private fun MatchGrid(entries: List<Entry>, onOpen: (Entry) -> Unit) {
                         )
                     }
                 }
+                items(es, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { e ->
+                    MatchCard(e.match, null) { onOpen(e) }
+                }
             }
-            items(es, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { e ->
+        } else {
+            items(entries, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { e ->
                 MatchCard(e.match, e.week) { onOpen(e) }
             }
         }
@@ -391,8 +416,9 @@ private fun WeekRail(
                 .then(if (horizontal) Modifier else Modifier.fillMaxWidth())
                 .clip(shape)
                 .background(if (on) Emerald else Background.copy(alpha = 0.4f))
-                .clickable(onClick = click)
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .selectable(selected = on, role = Role.Tab, onClick = click)
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Text(
                 label,
@@ -410,7 +436,13 @@ private fun WeekRail(
         }
     }
     if (horizontal) {
+        val listState = rememberLazyListState()
+        val selectedIndex = if (allWeeks) 0 else weeks.indexOfFirst { it.round == round }.takeIf { it >= 0 }?.plus(1) ?: 0
+        LaunchedEffect(selectedIndex, weeks.size) {
+            if (weeks.isNotEmpty()) listState.animateScrollToItem(selectedIndex)
+        }
         LazyRow(
+            state = listState,
             modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -456,7 +488,7 @@ private fun GoalsView(
     }
     val multiWeek = remember(entries) { entries.distinctBy { it.week }.size > 1 }
     if (all.isEmpty()) {
-        Centered { Text("No goal clips for this selection.", color = TextGray, textAlign = TextAlign.Center, modifier = Modifier.padding(24.dp)) }
+        EmptyState("No goal clips for this selection.")
         return
     }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -473,12 +505,12 @@ private fun GoalsView(
         groups.forEach { (w, m, goals) ->
             item {
                 Row(Modifier.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(m.homeTeam?.logo, m.homeTeam?.name, Modifier.size(20.dp))
+                    TeamLogo(m.homeTeam?.name, m.homeTeam?.logo, 20.dp)
                     Spacer(Modifier.width(8.dp))
                     Text(m.scoreLine, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f),
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.width(8.dp))
-                    AsyncImage(m.awayTeam?.logo, m.awayTeam?.name, Modifier.size(20.dp))
+                    TeamLogo(m.awayTeam?.name, m.awayTeam?.logo, 20.dp)
                     if (w != null && multiWeek)
                         Text("  $w", color = TextGray, style = MaterialTheme.typography.labelSmall)
                 }
@@ -501,7 +533,7 @@ private fun GoalCard(g: GoalRow, onClick: () -> Unit) {
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (g.team?.logo != null) AsyncImage(g.team.logo, g.team.name, Modifier.size(28.dp))
+        if (g.team?.logo != null) TeamLogo(g.team.name, g.team.logo, 28.dp)
         else Box(Modifier.size(28.dp).clip(CircleShape).background(Background), contentAlignment = Alignment.Center) {
             Text("—", color = TextGray, fontSize = 12.sp)
         }
@@ -528,7 +560,7 @@ private fun sideStyle(scoring: Boolean) =
 
 @Composable
 private fun TeamList(teams: List<TeamRef>, onPick: (TeamRef) -> Unit) {
-    if (teams.isEmpty()) { Centered { Text("No matches in this season yet.", color = TextGray) }; return }
+    if (teams.isEmpty()) { EmptyState("No matches in this season yet."); return }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         item { Text("Pick a team", color = TextGray, modifier = Modifier.padding(bottom = 4.dp)) }
         items(teams, key = { it.name }) { t ->
@@ -537,7 +569,7 @@ private fun TeamList(teams: List<TeamRef>, onPick: (TeamRef) -> Unit) {
                     .clickable { onPick(t) }.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AsyncImage(t.logo, t.name, Modifier.size(26.dp))
+                TeamLogo(t.name, t.logo, 26.dp)
                 Spacer(Modifier.width(12.dp))
                 Text(t.name)
             }
@@ -565,6 +597,43 @@ private fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Un
     }
 }
 
+/** Full league names stay readable on phones; larger layouts retain a compact segmented switch. */
+@Composable
+private fun LeagueSelector(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    if (LocalConfiguration.current.screenWidthDp >= 600) {
+        Segmented(labels, selected, onSelect)
+        return
+    }
+    val state = rememberLazyListState()
+    LaunchedEffect(selected) { state.animateScrollToItem(selected) }
+    LazyRow(
+        state = state,
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        items(labels.size) { i ->
+            FilterChip(
+                selected = i == selected,
+                onClick = { onSelect(i) },
+                label = { Text(labels[i], maxLines = 1) },
+                modifier = Modifier.heightIn(min = 48.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Surface,
+                    labelColor = OnDark,
+                    selectedContainerColor = Emerald,
+                    selectedLabelColor = Background,
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = i == selected,
+                    borderColor = MaterialTheme.colorScheme.outline,
+                    selectedBorderColor = Emerald,
+                ),
+            )
+        }
+    }
+}
+
 private fun defaultRound(s: Season?): Int? {
     val w = s?.beinSportsFixtureWeekList.orEmpty()
     return (w.firstOrNull { it.currentWeekForFixture == true } ?: w.lastOrNull())?.round
@@ -577,9 +646,10 @@ private fun Centered(content: @Composable () -> Unit) {
 
 @Composable
 private fun SkeletonGrid() {
-    val wide = LocalConfiguration.current.screenWidthDp > 600
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val minCardWidth = if (screenWidth < 600) 160.dp else 220.dp
     LazyVerticalGrid(
-        columns = GridCells.Fixed(if (wide) 3 else 2),
+        columns = GridCells.Adaptive(minCardWidth),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -597,16 +667,46 @@ private fun SkeletonGrid() {
 
 @Composable
 private fun ErrorBox(msg: String, onRetry: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-        Text("Couldn't load: $msg", color = TextGray, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(12.dp))
-        Button(onClick = onRetry) { Text("Retry") }
+    Surface(
+        color = Surface,
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier.padding(24.dp).widthIn(max = 420.dp),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+            Text("Couldn't load", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(msg, color = TextGray, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            Button(onClick = onRetry) { Text("Retry") }
+        }
+    }
+}
+
+@Composable
+private fun EmptyState(message: String) {
+    Centered {
+        Surface(
+            color = Surface,
+            shape = RoundedCornerShape(18.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.padding(24.dp).widthIn(max = 420.dp),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                Box(
+                    Modifier.size(40.dp).clip(CircleShape).background(Emerald.copy(alpha = 0.16f)),
+                    contentAlignment = Alignment.Center,
+                ) { Text("–", color = Emerald, style = MaterialTheme.typography.titleLarge) }
+                Spacer(Modifier.height(12.dp))
+                Text(message, color = TextGray, textAlign = TextAlign.Center)
+            }
+        }
     }
 }
 
 @Composable
 private fun Dropdown(
-    label: String, items: List<String>, modifier: Modifier = Modifier,
+    label: String, description: String, items: List<String>, modifier: Modifier = Modifier,
     icons: List<String?>? = null, leadingIcon: String? = null, onPick: (Int) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -615,10 +715,12 @@ private fun Dropdown(
             onClick = { open = true },
             enabled = items.isNotEmpty(),
             shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics {
+                contentDescription = "$description, $label"
+            },
             contentPadding = PaddingValues(horizontal = 10.dp),
         ) {
-            if (leadingIcon != null) { AsyncImage(leadingIcon, null, Modifier.size(22.dp)); Spacer(Modifier.width(8.dp)) }
+            if (leadingIcon != null) { TeamLogo(label, leadingIcon, 22.dp); Spacer(Modifier.width(8.dp)) }
             Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ArrowDropDown, null)
         }
@@ -626,7 +728,7 @@ private fun Dropdown(
             items.forEachIndexed { i, t ->
                 DropdownMenuItem(
                     text = { Text(t) },
-                    leadingIcon = icons?.getOrNull(i)?.let { { AsyncImage(it, null, Modifier.size(22.dp)) } },
+                    leadingIcon = icons?.getOrNull(i)?.let { { TeamLogo(t, it, 22.dp) } },
                     onClick = { open = false; onPick(i) },
                 )
             }
@@ -642,13 +744,18 @@ fun Match.shortDate(): String = runCatching {
 
 @Composable
 private fun MatchCard(m: Match, weekLabel: String?, onClick: () -> Unit) {
-    Column(
-        Modifier.clip(RoundedCornerShape(14.dp)).background(Surface).clickable(onClick = onClick)
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.72f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 0.dp),
+        modifier = Modifier.fillMaxWidth().semantics(mergeDescendants = true) { role = Role.Button },
     ) {
         Box {
             AsyncImage(
                 model = m.highlightThumbnail,
-                contentDescription = m.highLightTitle,
+                contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Background),
             )
@@ -670,7 +777,7 @@ private fun MatchCard(m: Match, weekLabel: String?, onClick: () -> Unit) {
             Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AsyncImage(m.homeTeam?.logo, m.homeTeam?.name, Modifier.size(22.dp))
+            TeamLogo(m.homeTeam?.name, m.homeTeam?.logo, 22.dp)
             Text(
                 "${scoreText(m.homeTeam)}–${scoreText(m.awayTeam)}",
                 fontWeight = FontWeight.Bold,
@@ -678,7 +785,7 @@ private fun MatchCard(m: Match, weekLabel: String?, onClick: () -> Unit) {
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
             )
-            AsyncImage(m.awayTeam?.logo, m.awayTeam?.name, Modifier.size(22.dp))
+            TeamLogo(m.awayTeam?.name, m.awayTeam?.logo, 22.dp)
         }
         Text(
             "${m.homeTeam?.name ?: ""} – ${m.awayTeam?.name ?: ""}",
@@ -689,6 +796,28 @@ private fun MatchCard(m: Match, weekLabel: String?, onClick: () -> Unit) {
         Text(
             m.shortDate(), color = TextGray, style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 2.dp, bottom = 10.dp),
+        )
+    }
+}
+
+/** A logo with a stable initial fallback, so failed/slow image requests never leave an empty target. */
+@Composable
+private fun TeamLogo(name: String?, logo: String?, size: androidx.compose.ui.unit.Dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape).background(Background),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            name?.trim()?.firstOrNull()?.uppercaseChar()?.toString() ?: "–",
+            color = TextGray,
+            fontSize = (size.value * 0.45f).sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (!logo.isNullOrBlank()) AsyncImage(
+            model = logo,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
         )
     }
 }

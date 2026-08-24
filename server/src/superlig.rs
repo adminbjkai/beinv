@@ -31,9 +31,26 @@ static YT: Mutex<Option<YtIndex>> = Mutex::const_new(None);
 static BY_MATCH: Mutex<Option<HashMap<u64, String>>> = Mutex::const_new(None);
 
 const SPONSORS: &[&str] = &[
-    "corendon", "tumosan", "trendyol", "sipay", "yilport", "mondihome", "atakas", "bitexen",
-    "vavacars", "ikas", "reeder", "onvo", "hellas", "rams", "eminevim", "bellona", "pasha",
-    "solanis", "misli", "ikascasino",
+    "corendon",
+    "tumosan",
+    "trendyol",
+    "sipay",
+    "yilport",
+    "mondihome",
+    "atakas",
+    "bitexen",
+    "vavacars",
+    "ikas",
+    "reeder",
+    "onvo",
+    "hellas",
+    "rams",
+    "eminevim",
+    "bellona",
+    "pasha",
+    "solanis",
+    "misli",
+    "ikascasino",
 ];
 
 fn seed_map() -> HashMap<u64, String> {
@@ -76,10 +93,7 @@ fn title_has_club(title_norm: &str, club: &str) -> bool {
     if title_norm.contains(club) {
         return true;
     }
-    club.split_whitespace()
-        .last()
-        .map(|last| last.len() >= 5 && title_norm.contains(last))
-        .unwrap_or(false)
+    club.split_whitespace().last().map(|last| last.len() >= 5 && title_norm.contains(last)).unwrap_or(false)
 }
 
 pub fn pick_best(cands: &[YtVid], home: &str, away: &str) -> Option<String> {
@@ -265,8 +279,7 @@ pub async fn attach_hd(client: &reqwest::Client, season: u64, matches: &mut [Mat
     let index = load_yt_index(client).await;
     let mut known = known_ids().await;
     for m in matches.iter_mut() {
-        let yt = pick_best(&index, &m.home.name, &m.away.name)
-            .or_else(|| known.get(&m.id).cloned());
+        let yt = pick_best(&index, &m.home.name, &m.away.name).or_else(|| known.get(&m.id).cloned());
         let yt = match yt {
             Some(id) => Some(id),
             None => search_one(client, &m.home.name, &m.away.name).await,
@@ -306,10 +319,7 @@ mod tests {
                 secs: 435,
             },
         ];
-        assert_eq!(
-            pick_best(&cands, "Corendon Alanyaspor", "Beşiktaş").as_deref(),
-            Some("QJ31yOM88UQ")
-        );
+        assert_eq!(pick_best(&cands, "Corendon Alanyaspor", "Beşiktaş").as_deref(), Some("QJ31yOM88UQ"));
         assert!(sl_highlight("Alanyaspor - Beşiktaş - Highlights/Özet | Trendyol Süper Lig - 2026/27"));
         assert!(!sl_highlight("Vanspor - İstanbulspor | 3. Hafta Maç ÖZETİ | Trendyol 1. Lig - 2026/27"));
     }

@@ -14,19 +14,19 @@ export default function ClipList({ items, index, onIndex, chips = false }: Props
     if (g && g.week === week) g.items.push(it); else groups.push({ week, from: i, items: [it] })
   })
   return (
-    <div ref={root} className={chips ? 'space-y-3' : 'space-y-2'}>
+    <div ref={root} className={chips ? 'space-y-3' : 'space-y-2'} aria-label="Playlist clips">
       {groups.map(g => (
         <section key={g.from}>
           {g.week && <h3 className={`mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/45 ${chips ? '' : 'px-2.5 pt-1'}`}>
             <span className="rounded bg-accent/80 px-1.5 py-0.5 normal-case tracking-normal text-black">{g.week}</span>
           </h3>}
-          <div className={chips ? 'flex flex-wrap gap-2' : 'space-y-0.5'}>
+          <div className={chips ? 'flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none] sm:flex-wrap [&::-webkit-scrollbar]:hidden' : 'space-y-0.5'}>
             {g.items.map((it, j) => {
               const i = g.from + j, on = i === index
               const label = it.event ? `${it.event.minute}' ${it.event.description}` : 'Full highlight'
               return chips ? (
                 <button key={it.key} onClick={() => onIndex(i)} aria-current={on} title={it.title}
-                  className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${on ? 'bg-white text-black' : 'glass text-white/80 hover:border-white/20 hover:text-white'}`}>
+                  className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${on ? 'bg-white text-black shadow-lg' : 'glass text-white/75 hover:border-white/20 hover:text-white'}`}>
                   {it.logo && <img src={it.logo} alt="" className="h-4 w-4 object-contain" />}
                   {it.event?.is_goal && !it.logo && <span className="h-1.5 w-1.5 rounded-full bg-accent" />}
                   <span className="max-w-[14rem] truncate">{label}</span>

@@ -153,67 +153,70 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   const pct = dur ? (time / dur) * 100 : 0
   const bpct = dur ? (buffered / dur) * 100 : 0
   const visible = show || !playing || clips
-  const btn = 'rounded-lg px-2 py-1 text-xs font-semibold transition hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent'
+  const btn = 'inline-flex min-h-10 items-center justify-center rounded-lg px-2.5 text-xs font-semibold transition hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent'
 
   return (
     <div ref={wrap} onMouseMove={poke} onMouseLeave={() => playing && !clips && setShow(false)}
-      className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-[0_30px_80px_-20px_rgba(0,0,0,.8)] select-none">
-      <video ref={v} src={item.src} poster={item.poster} autoPlay playsInline preload="auto"
-        onClick={toggle} onDoubleClick={fullscreen} onError={() => setErr(true)}
-        className="h-full w-full bg-black object-contain" />
+      className="player-shell glass control-surface group relative w-full overflow-hidden rounded-2xl bg-black shadow-[0_30px_80px_-20px_rgba(0,0,0,.8)] select-none">
+      <div className="player-stage relative aspect-video w-full overflow-hidden bg-black">
+        <video ref={v} src={item.src} poster={item.poster} autoPlay playsInline preload="auto"
+          onClick={toggle} onDoubleClick={fullscreen} onError={() => setErr(true)}
+          className="h-full w-full bg-black object-contain" />
 
-      {waiting && !err && (
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-accent" />
-          {prep && <p className="text-sm font-medium text-white/70">Preparing highlight…</p>}
-        </div>
-      )}
-
-      {err && (
-        <div className="absolute inset-0 z-[1] grid place-items-center bg-black/75 p-6 text-center">
-          <div>
-            <p className="mb-3 text-sm text-white/80">Could not play this highlight.</p>
-            <button
-              onClick={() => { setErr(false); const el = v.current; if (el) { el.load(); el.play().catch(() => {}) } }}
-              className="rounded-full bg-accent px-4 py-2 text-sm font-semibold text-black">
-              Retry
-            </button>
+        {waiting && !err && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3" role="status">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-accent" aria-hidden="true" />
+            {prep && <p className="text-sm font-medium text-white/70">Preparing highlight…</p>}
           </div>
-        </div>
-      )}
+        )}
 
-      {!playing && !waiting && !err && (
-        <button onClick={toggle} aria-label="Play"
-          className="absolute inset-0 grid place-items-center bg-black/20 transition hover:bg-black/30">
-          <span className="grid h-20 w-20 place-items-center rounded-full bg-white/90 text-black shadow-2xl transition group-hover:scale-105">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
-          </span>
-        </button>
-      )}
-
-      {clips && (
-        <aside ref={drawer} onMouseMove={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
-          className="glass absolute inset-y-0 right-0 z-10 hidden w-[35%] max-w-[35%] flex-col border-l border-white/10 shadow-2xl min-[900px]:flex">
-          <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2.5 text-sm font-semibold">
-            <span>Clips</span><span className="text-xs font-medium text-white/50">{index + 1} of {items.length}</span>
-            <button onClick={() => setClips(false)} className="ml-auto rounded-lg px-2 py-0.5 text-xs text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close clips (c)">✕</button>
+        {err && (
+          <div className="absolute inset-0 z-[2] grid place-items-center bg-black/80 p-6 text-center" role="alert">
+            <div>
+              <span className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-full bg-red-400/15 font-bold text-red-300" aria-hidden="true">!</span>
+              <p className="mb-3 text-sm font-medium text-white/80">Could not play this highlight.</p>
+              <button
+                onClick={() => { setErr(false); const el = v.current; if (el) { el.load(); el.play().catch(() => {}) } }}
+                className="min-h-10 rounded-full bg-accent px-5 text-sm font-bold text-black transition hover:brightness-110">
+                Retry
+              </button>
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
-            <ClipList items={items} index={index} onIndex={i => { onIndex(i); poke() }} />
-          </div>
-        </aside>
-      )}
+        )}
 
-      <div className={`absolute inset-y-auto left-0 top-0 flex items-start ${clips ? 'right-[35%] max-[899px]:right-0' : 'right-0'} justify-between gap-4 bg-gradient-to-b from-black/70 to-transparent p-4 text-sm font-semibold text-white/90 transition-opacity ${visible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="min-w-0">
-          <div className="line-clamp-2 leading-snug">{item.title}</div>
-          {next && <div className="truncate text-xs font-medium text-white/60">Up next: {next.title}</div>}
-          {prev && <div className="truncate text-xs font-medium text-white/40">Previous: {prev.event ? `${prev.week ? prev.week + ' · ' : ''}${prev.event.minute}' ${prev.event.description}` : prev.title}</div>}
+        {!playing && !waiting && !err && (
+          <button onClick={toggle} aria-label="Play"
+            className="absolute inset-0 z-[1] grid place-items-center bg-black/20 transition hover:bg-black/30">
+            <span className="grid h-16 w-16 place-items-center rounded-full bg-white/95 text-black shadow-2xl transition group-hover:scale-105 sm:h-20 sm:w-20">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+            </span>
+          </button>
+        )}
+
+        {clips && (
+          <aside ref={drawer} onMouseMove={e => e.stopPropagation()} onClick={e => e.stopPropagation()}
+            className="glass absolute inset-y-0 right-0 z-10 hidden w-[35%] max-w-[35%] flex-col border-l border-white/10 shadow-2xl min-[900px]:flex" aria-label="Clips">
+            <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2.5 text-sm font-semibold">
+              <span>Clips</span><span className="text-xs font-medium text-white/50">{index + 1} of {items.length}</span>
+              <button onClick={() => setClips(false)} className="ml-auto grid h-9 w-9 place-items-center rounded-lg text-xs text-white/60 transition hover:bg-white/10 hover:text-white" aria-label="Close clips (c)">✕</button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+              <ClipList items={items} index={index} onIndex={i => { onIndex(i); poke() }} />
+            </div>
+          </aside>
+        )}
+
+        <div aria-live="polite" className={`player-top absolute left-0 top-0 flex items-start ${clips ? 'right-[35%] max-[899px]:right-0' : 'right-0'} justify-between gap-3 bg-gradient-to-b from-black/80 via-black/35 to-transparent p-3 text-sm font-semibold text-white/90 transition-opacity sm:p-4 ${visible ? 'opacity-100' : 'opacity-0 group-focus-within:opacity-100'}`}>
+          <div className="min-w-0">
+            <div className="line-clamp-2 max-w-3xl leading-snug">{item.title}</div>
+            {next && <div className="mt-0.5 hidden truncate text-xs font-medium text-white/60 sm:block">Up next: {next.title}</div>}
+            {prev && <div className="hidden truncate text-xs font-medium text-white/40 md:block">Previous: {prev.event ? `${prev.week ? prev.week + ' · ' : ''}${prev.event.minute}' ${prev.event.description}` : prev.title}</div>}
+          </div>
+          {items.length > 1 && <span className="shrink-0 rounded-full bg-black/35 px-2 py-1 text-[11px] font-semibold text-white/70 backdrop-blur">{index + 1} of {items.length}</span>}
         </div>
-        {items.length > 1 && <span className="shrink-0 text-xs font-medium text-white/60">Now playing · {index + 1} of {items.length}</span>}
       </div>
 
-      <div className={`absolute bottom-0 left-0 bg-gradient-to-t ${clips ? 'right-[35%] max-[899px]:right-0' : 'right-0'} from-black/80 via-black/40 to-transparent px-4 pb-3 pt-10 transition-opacity ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`player-controls ${clips ? 'min-[900px]:right-[35%]' : 'right-0'} ${visible ? 'controls-visible' : ''}`}>
         <div className="relative mb-2 h-1 w-full rounded-full bg-white/20">
           <div className="absolute inset-y-0 left-0 rounded-full bg-white/35" style={{ width: `${bpct}%` }} />
           <div className="absolute inset-y-0 left-0 rounded-full bg-accent" style={{ width: `${pct}%` }} />
@@ -221,18 +224,21 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
             onChange={e => { if (v.current) v.current.currentTime = +e.target.value }}
             className="absolute -top-1.5 left-0 h-4 w-full cursor-pointer" aria-label="Seek" />
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-white md:gap-3">
-          <button onClick={() => step(-1)} disabled={index === 0} className={btn} aria-label="Previous clip (p)">⏮</button>
-          <button onClick={toggle} className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-white/10" aria-label={playing ? 'Pause' : 'Play'}>
+        <div className="flex items-center gap-1 text-white sm:gap-2">
+          <button onClick={() => step(-1)} disabled={index === 0} className={`${btn} w-9 px-0 sm:w-10`} aria-label="Previous clip (p)">⏮</button>
+          <button onClick={toggle} className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white text-black shadow-lg transition hover:bg-white/90 sm:h-11 sm:w-11" aria-label={playing ? 'Pause' : 'Play'}>
             {playing
               ? <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z" /></svg>
               : <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>}
           </button>
-          <button onClick={() => step(1)} disabled={index >= items.length - 1} className={btn} aria-label="Next clip (n)">⏭</button>
-          <button onClick={() => seekBy(-10)} className={btn}>−10s</button>
-          <button onClick={() => seekBy(10)} className={btn}>+10s</button>
+          <button onClick={() => step(1)} disabled={index >= items.length - 1} className={`${btn} w-9 px-0 sm:w-10`} aria-label="Next clip (n)">⏭</button>
+          <button onClick={() => seekBy(-10)} className={`${btn} px-1.5 sm:px-2.5`} aria-label="Seek back 10 seconds">−10s</button>
+          <button onClick={() => seekBy(10)} className={`${btn} px-1.5 sm:px-2.5`} aria-label="Seek forward 10 seconds">+10s</button>
+          <span className="ml-auto whitespace-nowrap text-[10px] font-medium tabular-nums text-white/70 sm:text-xs">{fmt(time)} <span className="text-white/30">/</span> {fmt(dur)}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-1 text-white sm:mt-0">
           <div className="flex items-center gap-2">
-            <button onClick={() => setMuted(m => !m)} className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-white/10" aria-label="Mute">
+            <button onClick={() => setMuted(m => !m)} className="grid h-10 w-10 place-items-center rounded-lg transition hover:bg-white/10" aria-label={muted ? 'Unmute' : 'Mute'}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 {muted || vol === 0
                   ? <path d="M16.5 12A4.5 4.5 0 0 0 14 8v2.2l2.5 2.5zM19 12c0 .9-.2 1.8-.5 2.6l1.5 1.5A9 9 0 0 0 21 12a9 9 0 0 0-7-8.8v2.1A7 7 0 0 1 19 12zM4.3 3 3 4.3 7.7 9H3v6h4l5 5v-6.7l4.3 4.3c-.7.5-1.4.9-2.3 1.1v2.1c1.4-.3 2.6-1 3.7-1.8L19.7 21 21 19.7zM12 4 9.9 6.1 12 8.2z" />
@@ -240,19 +246,18 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
               </svg>
             </button>
             <input type="range" min={0} max={1} step={0.02} value={muted ? 0 : vol}
-              onChange={e => { setVol(+e.target.value); setMuted(false) }} className="w-20" aria-label="Volume" />
+              onChange={e => { setVol(+e.target.value); setMuted(false) }} className="hidden w-20 sm:block" aria-label="Volume" />
           </div>
-          <span className="ml-1 text-xs tabular-nums text-white/80">{fmt(time)} / {fmt(dur)}</span>
           <div className="ml-auto flex items-center gap-1">
             <button onClick={() => onAutoNext(!autoNext)} aria-pressed={autoNext} title="Autoplay next clip"
               className={`${btn} ${autoNext ? 'text-accent' : 'text-white/60'}`}>
               Autoplay {autoNext ? 'on' : 'off'}
             </button>
             {items.length > 1 && (
-              <button ref={clipsBtn} onClick={() => setClips(c => !c)} aria-pressed={clips} aria-label="Clips (c)" className={`${btn} ${clips ? 'text-accent' : ''}`}>Clips</button>
+              <button ref={clipsBtn} onClick={() => setClips(c => !c)} aria-pressed={clips} aria-label="Clips (c)" className={`${btn} desktop-clips-toggle ${clips ? 'text-accent' : ''}`}>Clips</button>
             )}
-            <button onClick={pip} className={btn}>PiP</button>
-            <button onClick={fullscreen} className="grid h-9 w-9 place-items-center rounded-lg transition hover:bg-white/10" aria-label="Fullscreen (f)">
+            <button onClick={pip} className={`${btn} px-2`} aria-label="Picture in picture">PiP</button>
+            <button onClick={fullscreen} className="grid h-10 w-10 place-items-center rounded-lg transition hover:bg-white/10" aria-label="Fullscreen (f)">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7zm-2-4h2V7h3V5H5zm12 7h-3v2h5v-5h-2zM14 5v2h3v3h2V5z" /></svg>
             </button>
           </div>

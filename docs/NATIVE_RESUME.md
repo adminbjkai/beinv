@@ -1,21 +1,22 @@
-# Native resume (Android + tvOS) after web v2.7
+# Native resume (Android + tvOS) after the v2.8 UI pass
 
-> **Start here on the Mac.** Web and the Rust backend are done and live on
-> [beinv.bjk.ai](https://beinv.bjk.ai/). v2.7.1: Android debug APK walked on
-> Pixel_9; tvOS installed, launched, and UI-tested on the Living Room Apple TV
-> (`D40125DD-…`). Remaining: production deploy of the v2.7.1 SPA (Docker is
-> not on this Mac).
+> **Start here on the Mac.** The v2.7 product/backend remains live on
+> [beinv.bjk.ai](https://beinv.bjk.ai/). The v2.8 checkout has been browser-tested
+> locally, built/installed/walked on Pixel_9, and built/installed/UI-tested on the
+> Apple TV 4K simulator. v2.7.1 remains the latest physical Living Room Apple TV
+> install (`D40125DD-…`). Remaining outside this source task: production web deploy
+> and, if desired, installing v2.8 on the physical Apple TV.
 
-Spec to match: [FEATURES.md](FEATURES.md) v2.7.  
-Upstream: [UPSTREAM_API.md](UPSTREAM_API.md) §§C–F.  
-What shipped on web: [CHANGELOG.md](CHANGELOG.md) v2.7.
+Spec to match: [FEATURES.md](FEATURES.md) v2.8.
+Upstream: [UPSTREAM_API.md](UPSTREAM_API.md) §§C–F.
+Current UI validation: [reports/ui-v2.8.md](reports/ui-v2.8.md).
 
 ---
 
 ## 1. What is already live (do not re-implement)
 
-Reference the web app while you work. If native disagrees with web, **web is
-the source of truth**.
+Reference the web app while you work. Web is the source of truth for product
+data and behavior; visual treatment remains platform-native.
 
 | Feature | Web / backend (verified 2026-08-24) |
 |---|---|
@@ -39,8 +40,8 @@ Live URLs to keep open in a browser while testing native:
 
 ## 2. What is already in the native source
 
-Landed on `main` in `1371b5e`. Treat this as a **first cut to compile and
-verify**, not as a finished port.
+The v2.7 data/playback port is established and v2.8 adds a verified native UI
+refinement pass. Do not re-port the server matching/remux logic to either client.
 
 ### Shared behaviour (both apps)
 
@@ -59,7 +60,8 @@ verify**, not as a finished port.
 | `Models.kt` | `BEINV`, `League.usesHdToggle()`, `hdVideoUrl()`, `Match.playable(...)`, `BeinvMatch` DTO |
 | `Api.kt` | La Liga weeks decoded from the beinv JSON list, not beIN `highlights/events` |
 | `Prefs.kt` | `hd` (default true), `allWeeks` (default true) |
-| `BrowseScreen.kt` | HD switch; `WeekRail` (left column if width > 700 dp, else horizontal chips); All weeks loads `seasonMatches`; `playMatch` rewrites the highlight URL |
+| `BrowseScreen.kt` | Full-name phone league chips; adaptive grid; auto-scrolling `WeekRail`; preserved By-team newest-first order; Material cards/logo fallbacks; structured states and semantics |
+| `PlayerScreen.kt` | Accessible clip selection, explicit playback Retry, portrait list, landscape 35% drawer and PiP |
 
 Build (Mac):
 
@@ -81,7 +83,8 @@ Emulator DNS: boot with `-dns-server 8.8.8.8,1.1.1.1` or `beinsports.com.tr` / `
 |---|---|
 | `Models.swift` | `League.usesHdToggle` / `isLaLiga`, `Beinv` host helpers, `BeinvMatch`, `Match.playable(...)` |
 | `API.swift` | La Liga weeks from `Beinv.host` `/api/leagues/.../weeks/{round}` |
-| `BrowseView.swift` | `hd` + `allWeeks` published + persisted; left `weekRail` (`week.all`); mode row **HD on/off**; All weeks uses `seasonMatches`; playback goes through `playable` |
+| `BrowseView.swift` | Compact HD control, focus-safe selected markers, contained week rail, richer cards/pickers/state panels; `hd` + `allWeeks` remain persisted |
+| `PlayerView.swift` | Taller accessible native Clips rows and richer press-and-hold clip selection; AVKit queue behavior unchanged |
 
 Build (Mac):
 
@@ -103,9 +106,9 @@ Device install still uses the `DEVELOPMENT_TEAM` in `project.yml` (7-day free-te
 Tick against the **web** URLs in §1. Screenshot into `android/build/` and `tv/build/` if you add a report.
 
 ### A. Compile
-- [x] Android `assembleDebug` green — `android/app/build/outputs/apk/debug/app-debug.apk` (2026-08-24, v2.7.1)
-- [x] tvOS `xcodegen generate` + `xcodebuild` green — simulator and **device** (`Debug-appletvos/Highlights.app`)
-- [x] Existing unit tests still pass (`HighlightsTests` **TEST SUCCEEDED** 2026-08-24; no Android unit tests)
+- [x] Android v2.8 `testDebugUnitTest assembleDebug lintDebug` green — 13 MB `android/app/build/outputs/apk/debug/app-debug.apk`; installed/launched on Pixel_9 (no Android unit-test sources)
+- [x] tvOS v2.8 `xcodegen generate` + simulator build/test green — 4 unit + 3 `XCUIRemote` UI tests; installed/launched on Apple TV 4K simulator
+- [x] Web v2.8 tests/build/lint green (lint: no errors; existing hook advisories), plus Chromium checks at 1440/390/320 px
 
 ### B. HD (Super Lig + Premier League)
 - [x] Super Lig: HD switch is **on** on first launch (Pixel_9). Played Galatasaray–Çorum (`1 of 15`).
@@ -133,21 +136,22 @@ Tick against the **web** URLs in §1. Screenshot into `android/build/` and `tv/b
 - [x] Super Lig Goals: running score, scoring-team, Play all week → kick-off → minute (`53' Osimhen` then `58' Kyziridis`).
 - [x] By team team list A–Z (Only \<Team\> goals control present).
 - [x] Player next/prev chrome (`1 of N`, Up next) on Android.
-- [x] Android PiP: City–Bournemouth floated over the launcher; Back from the windowed player returned to the list. Landscape drawer / fullscreen Back not rotated this pass (phone stayed portrait).
-- [x] tvOS Clips tab: `HighlightsUITests` **TEST SUCCEEDED** on the Living Room Apple TV (`testPlayAllOpensPlayerAndMenuReturns` opened `player.clips` and jumped).
+- [x] Android PiP floats over the launcher; landscape immersive player, 35% drawer, clip jump and Back order were walked on Pixel_9 in v2.8.
+- [x] tvOS Clips tab: v2.8 simulator `HighlightsUITests` opens `player.clips`, jumps, and returns with Menu; v2.7.1 previously passed the same path on the Living Room Apple TV.
 
 ### F. UI tests / identifiers
-tvOS UI tests do **not** depend on `week.prev` / `week.button` (those controls were removed). New id: `week.all`, `hd.toggle`. If a test fails because focus order changed (week rail is now beside the grid), fix the test, not the rail.
+tvOS UI tests do **not** depend on `week.prev` / `week.button` (those controls were removed). Current ids include `week.all` and `hd.toggle`; `testHdToggleIsRemoteOperable` protects focus/action behavior. If a test fails because focus order changed, verify the actual focus graph before changing either the test or UI.
 
 ---
 
-## 4. Known gaps vs web (polish)
+## 4. Known gaps / release state
 
 1. **Week section headers.** Done in v2.7.1 — All-weeks grids group under `N. Hafta · M matches` on Android and tvOS.
 2. **tvOS HD control.** Done in v2.7.1 — `Toggle("HD")` on the mode row (`hd.toggle`).
 3. **First remux delay.** Softened in v2.7.1: after a week/season loads, native `GET`s the same `beinv.bjk.ai` week/season route the web app uses, which starts `youtube::warm`. First tap of a never-seen YouTube id can still take ~15 s.
 4. **All-weeks first load of La Liga 2025/26** hits 38 weeks through the proxy; some weeks still search YouTube on the server the first time. Show the existing “Loading season… x/N” and do not assume it is instant.
-5. **Device QA report.** [android-v2.7.md](reports/android-v2.7.md), [tvos-v2.7.md](reports/tvos-v2.7.md). §3 B–E walked 2026-08-24.
+5. **v2.8 validation report.** [ui-v2.8.md](reports/ui-v2.8.md). Android was walked on Pixel_9; tvOS was walked on simulator, not reinstalled on the physical Apple TV.
+6. **Web deploy.** v2.8 is in source and locally browser-tested; production remains on the earlier live build until the Docker deployment is run in its deployment environment.
 
 ---
 
@@ -162,6 +166,6 @@ tvOS UI tests do **not** depend on `week.prev` / `week.button` (those controls w
 
 ## 6. When you are done
 
-1. Walk §3 B–E on a device/emulator and tick the boxes.
-2. Add the playback evidence to [reports/android-v2.7.md](reports/android-v2.7.md) and [reports/tvos-v2.7.md](reports/tvos-v2.7.md).
-3. Flip the native row in [FEATURES.md](FEATURES.md) § Client status from “built” to “verified” once those rows are walked.
+1. Re-run §3 for any future native behavior change.
+2. Add new evidence to a versioned report without rewriting the v2.7 historical reports.
+3. Distinguish simulator/emulator validation from physical-device installs in README and FEATURES status rows.

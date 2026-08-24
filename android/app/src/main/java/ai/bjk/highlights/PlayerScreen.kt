@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -33,6 +35,10 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +49,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -64,6 +71,7 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
     val clips = playlist.clips
     var current by remember { mutableIntStateOf(playlist.start) }
     val positions = remember { HashMap<Int, Long>() } // best-effort resume per clip
+    var playerError by remember { mutableStateOf<String?>(null) }
 
     // --- fullscreen: manual toggle OR device rotated to landscape ---
     val deviceLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -120,10 +128,14 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
                 }
             }
             override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) playerError = null
                 if (state == Player.STATE_ENDED) { // last clip ended (no loop): back to the list
                     if (fsRequested) exitFullscreen()
                     onBack()
                 }
+            }
+            override fun onPlayerError(error: PlaybackException) {
+                playerError = error.errorCodeName
             }
         }
         player.addListener(listener)
@@ -172,23 +184,31 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
     Column(Modifier.fillMaxSize().background(if (fullscreen || inPip) Color.Black else Background)
         .then(if (fullscreen || inPip) Modifier else Modifier.statusBarsPadding())) {
         if (!fullscreen && !inPip) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 4.dp)) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        "${current + 1} of ${clips.size}", color = Emerald, style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        clips.getOrNull(current)?.title ?: playlist.title, style = MaterialTheme.typography.titleSmall,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if ((activity as? MainActivity) != null) {
-                    TextButton(onClick = { (activity as MainActivity).enterPip() }) { Text("PiP", color = Emerald) }
+            Surface(color = ai.bjk.highlights.Surface, contentColor = OnDark) {
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
+                    ) {
+                        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "${current + 1} of ${clips.size}", color = Emerald,
+                                style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                clips.getOrNull(current)?.title ?: playlist.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if ((activity as? MainActivity) != null) {
+                            TextButton(onClick = { (activity as MainActivity).enterPip() }) { Text("PiP", color = Emerald) }
+                        }
+                    }
+                    NextPrevBar(upNext, previous)
                 }
             }
-            NextPrevBar(upNext, previous)
         }
         Box(if (fullscreen || inPip) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
         AndroidView(
@@ -206,9 +226,29 @@ fun PlayerScreen(playlist: Playlist, inPip: Boolean, onBack: () -> Unit) {
             update = { it.useController = !inPip },
             modifier = Modifier.fillMaxSize(),
         )
+        val error = playerError
+        if (error != null && !inPip) {
+            Column(
+                Modifier.align(Alignment.Center).clip(RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = 0.88f)).padding(horizontal = 22.dp, vertical = 18.dp)
+                    .semantics { stateDescription = "Playback error" },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text("Couldn't play this video", color = OnDark, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(4.dp))
+                Text(error, color = TextGray, style = MaterialTheme.typography.labelSmall)
+                Spacer(Modifier.height(6.dp))
+                TextButton(onClick = { playerError = null; player.prepare(); player.play() }) {
+                    Text("Retry", color = Emerald)
+                }
+            }
+        }
         if (fullscreen) {
             // Landscape: "Clips" button in the chrome toggles a right side drawer (≤ 35 % width); video keeps playing.
-            if (drawer) Box(Modifier.fillMaxSize().clickable { drawer = false }) // tap outside closes
+            if (drawer) Box(
+                Modifier.fillMaxSize().clickable { drawer = false }
+                    .semantics { contentDescription = "Close clips" }
+            ) // tap outside closes
             TextButton(
                 onClick = { drawer = !drawer },
                 modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
@@ -293,7 +333,8 @@ private fun LazyListScope.clipRows(clips: List<Clip>, current: Int, compact: Boo
             Row(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
                     .background(if (sel) Emerald.copy(alpha = 0.2f) else if (compact) Color.White.copy(alpha = 0.06f) else Surface)
-                    .clickable { onPick(i) }
+                    .selectable(selected = sel, role = Role.Button) { onPick(i) }
+                    .semantics { stateDescription = if (sel) "Now playing" else "Clip ${i + 1} of ${clips.size}" }
                     .padding(horizontal = if (compact) 10.dp else 12.dp, vertical = if (compact) 8.dp else 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

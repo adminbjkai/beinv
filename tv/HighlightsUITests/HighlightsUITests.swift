@@ -52,6 +52,29 @@ final class HighlightsUITests: XCTestCase {
         XCTAssertTrue(ok, "neither a running score nor the empty state appeared")
     }
 
+    /// The tvOS switch style must stay compact, focusable, and actionable from the Siri Remote.
+    func testHdToggleIsRemoteOperable() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-reset"]
+        app.launch()
+
+        let season = app.buttons["season.button"]
+        XCTAssertTrue(season.waitForExistence(timeout: 20), "season button missing")
+        XCTAssertTrue(NSPredicate(format: "label != 'Season' AND label != ''").wait(for: season, timeout: 30))
+
+        let hd = app.descendants(matching: .any)["hd.toggle"]
+        XCTAssertTrue(hd.waitForExistence(timeout: 5), "HD toggle missing")
+        let modeRowFocused = { Mode.allCases.contains { app.buttons["mode.\($0)"].hasFocus } || hd.hasFocus }
+        XCTAssertTrue(press(.down) { modeRowFocused() }, "could not reach mode row")
+        XCTAssertTrue(press(.right, max: 5) { hd.hasFocus }, "could not focus HD toggle")
+
+        let before = hd.value as? String
+        remote.press(.select)
+        if let before {
+            XCTAssertTrue(NSPredicate(format: "value != %@", before).wait(for: hd, timeout: 5), "HD toggle did not change")
+        }
+    }
+
     /// §2b: Goals → Play all opens the player (`player.view`); Menu returns to the browse screen.
     func testPlayAllOpensPlayerAndMenuReturns() throws {
         let app = XCUIApplication()
