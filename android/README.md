@@ -4,6 +4,8 @@ Small native Android app (Kotlin, Jetpack Compose, Media3 ExoPlayer) that lists 
 match highlights from beinsports.com.tr (Süper Lig, Premier League, İspanya La Liga) and plays them.
 Süper Lig / Premier League catalogs come from beIN; HD full-highlights and İspanya La Liga play from `https://beinv.bjk.ai` ([UPSTREAM_API.md](../docs/UPSTREAM_API.md) §D–F).
 
+**v2.7 source is on `main` but the APK has not been built.** Resume on a Mac with Android Studio: **[docs/NATIVE_RESUME.md](../docs/NATIVE_RESUME.md)** (checklist, files touched, live URLs to match).
+
 ## Features (v2.7 spec, `docs/FEATURES.md`)
 
 - Layout per §0 parity rules, top to bottom: **League** (`Trendyol Süper Lig` | `İngiltere Premier Lig` | `İspanya La Liga`) →
@@ -61,13 +63,15 @@ adb shell am start -n ai.bjk.highlights/.MainActivity
 
 - `app/src/main/java/ai/bjk/highlights/`
   - `MainActivity.kt` – single activity, Browse ⇄ Player via state; PiP entry + state
-  - `Models.kt` – leagues, lenient kotlinx-serialization models (`MatchEvent.eventTeamSide` → `Side`),
-    `Match.goalRows(round, week)` running-score walk (`GoalRow`), `orderedPlaylist()`, `Clip` (+ selector
-    metadata)/`Playlist`/`Mode`
-  - `Api.kt` – OkHttp suspend calls, in-memory caches, concurrent per-season fetch
-  - `Prefs.kt` – SharedPreferences (league, season/week per league, mode, team per league, By-team sub-switch/toggle)
-  - `BrowseScreen.kt` – top bar (league/season/week/mode/team rows), match grid, goal cards (`GoalCard`),
-    team view + `Only <Team> goals` filter, skeletons
+  - `Models.kt` – leagues, `BEINV` remux host, `Match.playable` HD rewrite, `BeinvMatch` DTO,
+    lenient kotlinx-serialization models (`MatchEvent.eventTeamSide` → `Side`),
+    `Match.goalRows(round, week)` running-score walk (`GoalRow`), `orderedPlaylist()`, `Clip`/`Playlist`/`Mode`
+  - `Api.kt` – OkHttp: beIN seasons/weeks for Super Lig + PL; La Liga weeks from `beinv.bjk.ai`;
+    in-memory caches, concurrent per-season fetch
+  - `Prefs.kt` – SharedPreferences (league, season/week per league, mode, team per league,
+    By-team sub-switch/toggle, **`hd` default true**, **`allWeeks` default true**)
+  - `BrowseScreen.kt` – top bar (league/season/mode/HD), `WeekRail` (left on wide, chips on phone;
+    All weeks default), match grid, goal cards (`GoalCard`), team view + `Only <Team> goals`, skeletons
   - `PlayerScreen.kt` – ExoPlayer playlist `PlayerView`, fullscreen/immersive, week-grouped clip list (`clipRows`), landscape drawer, `NextPrevBar`
   - `Theme.kt` – dark Material3 scheme (emerald accent, no purple)
 - `app/src/main/res/` – strings, theme, adaptive launcher icon (vector only)

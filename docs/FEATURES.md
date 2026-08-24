@@ -2,6 +2,16 @@
 
 All three clients (web, Android, Apple TV) implement the same feature set with platform-native UI. Data comes only from the endpoints in [UPSTREAM_API.md](UPSTREAM_API.md).
 
+### Client status (2026-08-24)
+
+| Client | v2.7 features | Built / run |
+|---|---|---|
+| **Web + Rust server** | Done and live on [beinv.bjk.ai](https://beinv.bjk.ai/) | Yes — browser + API |
+| **Android** | Source on `main` (`BrowseScreen` week rail, HD default, La Liga via remux host) | **No** — resume on Mac: [NATIVE_RESUME.md](NATIVE_RESUME.md) |
+| **tvOS** | Source on `main` (`weekRail`, HD, La Liga via remux host) | **No** — same resume doc |
+
+Native is a compile-and-verify job, not a green-field port. Do not re-implement matching/remux on device.
+
 ## 0. Parity rules (every client, same structure and wording)
 Top-to-bottom layout, identical labels:
 1. **League** switch: `Trendyol Süper Lig` | `İngiltere Premier Lig` | `İspanya La Liga` (exact names).

@@ -2,7 +2,7 @@
 
 Verified live 2026-08-22. No auth, cookies, or tokens needed. All calls are plain GET.
 
-Used by all clients: the Rust server (`server/src/bein.rs`, `video.rs`), the Apple TV app (`tv/Highlights/API.swift`) and the Android app (`android/app/src/main/java/ai/bjk/highlights/Api.kt`). Süper Lig / Premier League catalogs still come from beIN on native; HD full-highlights and every La Liga video play from `https://beinv.bjk.ai/video/…`.
+Used by all clients: the Rust server (`server/src/bein.rs`, `video.rs`), the Apple TV app (`tv/Highlights/API.swift`) and the Android app (`android/app/src/main/java/ai/bjk/highlights/Api.kt`). Süper Lig / Premier League catalogs still come from beIN on native; HD full-highlights and every La Liga video play from `https://beinv.bjk.ai/video/…`. Native **source** for that split is on `main`; binaries are not rebuilt yet — [NATIVE_RESUME.md](NATIVE_RESUME.md).
 
 ## Leagues we use
 

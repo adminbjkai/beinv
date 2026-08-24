@@ -37,14 +37,14 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
   server, a visible metadata bug and hot-path allocations on Android, warnings to zero on Android and
   tvOS ([reports/review-v2.6.md](reports/review-v2.6.md)).
 
-## v2.7 — Premier HD, all-weeks, La Liga 2025/26 ✅
-- Premier League HD from official NBC Sports; HD default on for Super Lig + PL on web/Android/tvOS.
-- Left week rail + All weeks highlights view; La Liga 2025/2026 overlay; native La Liga/HD via `beinv.bjk.ai`.
+## v2.7 — Premier HD, all-weeks, La Liga 2025/26 ✅ web / 🔨 native binaries
+- Premier League HD from official NBC Sports; HD default on for Super Lig + PL.
+- Left week rail + All weeks highlights view; La Liga 2025/2026 overlay; native source plays HD/La Liga via `beinv.bjk.ai`.
+- **Web verified live.** Android + tvOS **source is on `main` but not built** — continue from [NATIVE_RESUME.md](NATIVE_RESUME.md) on a Mac with Android Studio + Xcode.
 
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.
 - Search (team / player name in event descriptions).
-- Point Android/tvOS La Liga playback at the web remux proxy (or wait for beIN mp4s).
 - Other beIN leagues (1. Lig, Ligue 1/2, Portugal, Basketball) — same endpoints, different `orgId` ([UPSTREAM_API.md](UPSTREAM_API.md) lists them).
 - Top Shelf (tvOS) / home-screen widget (Android) with latest goals.
 - Offline cache of the last fetched week.
