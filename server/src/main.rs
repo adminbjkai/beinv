@@ -1,5 +1,6 @@
 mod bein;
 mod laliga;
+mod superlig;
 mod video;
 mod youtube;
 
@@ -59,11 +60,20 @@ async fn load_week(app: &App, lg: League, season: u64, round: u32) -> anyhow::Re
     let matches = app
         .weeks
         .try_get_with(key, async {
-            let ms = bein::fetch_week(&app.http, lg, season, round).await?;
+            let mut ms = bein::fetch_week(&app.http, lg, season, round).await?;
+            if lg.id == "super-lig" {
+                superlig::attach_hd(&app.http, season, &mut ms).await;
+            }
             for m in &ms {
                 if !m.highlight_url.is_empty() {
                     app.sources.insert(format!("m:{}", m.id), m.highlight_url.clone()).await;
                     if let Some(yt) = m.highlight_url.strip_prefix("yt:") {
+                        youtube::warm(yt);
+                    }
+                }
+                if !m.hd_url.is_empty() {
+                    app.sources.insert(format!("hd:{}", m.id), m.hd_url.clone()).await;
+                    if let Some(yt) = m.hd_url.strip_prefix("yt:") {
                         youtube::warm(yt);
                     }
                 }
@@ -151,9 +161,22 @@ async fn video(
     Query(q): Query<WeekQuery>,
     headers: HeaderMap,
 ) -> Result<Response, StatusCode> {
-    let key = format!("{kind}:{id}");
+    let hd = kind == "m" && q.q.as_deref() == Some("hd");
+    let key = if hd { format!("hd:{id}") } else { format!("{kind}:{id}") };
     let src = match app.sources.get(&key).await {
         Some(s) => s,
+        None if hd => {
+            // HD missing: re-fetch the week, then fall back to the standard beIN highlight.
+            if let (Some(l), Some(s), Some(r)) = (q.l.as_deref(), q.s, q.r) {
+                if let Some(lg) = bein::league(l) {
+                    let _ = load_week(&app, lg, s, r).await;
+                }
+            }
+            match app.sources.get(&key).await {
+                Some(s) => s,
+                None => app.sources.get(&format!("m:{id}")).await.ok_or(StatusCode::NOT_FOUND)?,
+            }
+        }
         None => {
             // Cold cache: the l/s/r hint tells us which week to re-fetch. It is optional so a
             // warm-cache hit still works for a bare `/video/{kind}/{id}`.

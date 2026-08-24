@@ -19,6 +19,7 @@ Every selection change must be reflected immediately and persist (see §1). No m
 - **Season**: always-visible picker listing every season from endpoint A (newest first). Default: `isCurrent`.
 - **Week**: picker + ‹ › stepping. Default: `currentWeekForFixture`, else the last week.
 - **Remember** last league/season/week (web: URL + localStorage; Android: DataStore/SharedPreferences; tvOS: UserDefaults).
+- **HD** (web, Trendyol Süper Lig only): toggle labelled `HD`. Off (default) plays the beIN mp4, including goal clips. On plays the official beIN SPORTS Türkiye YouTube full-match özet remuxed to the same player (1080p when published). Persisted in the URL (`hd=1`) and localStorage. Goal clips stay on the beIN feed. Android/tvOS have no HD toggle.
 
 ## 2. Views (mode toggle)
 - **Highlights** (default): match cards for the selected week. Premier League and İspanya La Liga are full-match highlights only (no per-goal clips); Goals / By-team-Goals are empty by data, not by bug. On web, La Liga 2026/2027 cards are filled from the overlay in [UPSTREAM_API.md §D](UPSTREAM_API.md); Android/tvOS talk to beIN directly so that league's weeks stay empty until beIN publishes mp4s.

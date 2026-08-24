@@ -110,4 +110,4 @@ Why a proxy for the web but not for tvOS/Android: browsers need a same-origin so
 
 ## Video notes
 
-beIN serves one progressive H.264 mp4 per highlight/clip (the only rendition → highest quality). Native decoders + byte-range streaming is the smoothest path; no HLS/ABR. La Liga 2026/2027 official highlights are remuxed to the same MP4 contract (best H.264 + AAC, typically 1080p50, `+faststart`) so the in-app player never loads an external video site.
+beIN serves one progressive H.264 mp4 per highlight/clip (the only rendition → highest quality). Native decoders + byte-range streaming is the smoothest path; no HLS/ABR. La Liga 2026/2027 official highlights are remuxed to the same MP4 contract (best H.264 + AAC, typically 1080p50, `+faststart`) so the in-app player never loads an external video site. Trendyol Süper Lig has an optional **HD** toggle that remuxes the official beIN SPORTS Türkiye YouTube özet the same way; goal clips stay on the beIN mp4.

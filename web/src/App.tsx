@@ -9,7 +9,7 @@ import Player from './components/Player'
 
 type Mode = 'highlights' | 'goals' | 'team'
 const MODES: [Mode, string][] = [['highlights', 'Highlights'], ['goals', 'Goals'], ['team', 'By team']]
-type Stored = { l?: string; s?: number; r?: number; mode?: Mode; t?: string; g?: boolean; og?: boolean; an?: boolean }
+type Stored = { l?: string; s?: number; r?: number; mode?: Mode; t?: string; g?: boolean; og?: boolean; an?: boolean; hd?: boolean }
 const LS = 'beinv.v2'
 const stored = (): Stored => { try { return JSON.parse(localStorage.getItem(LS) ?? '{}') } catch { return {} } }
 const isMode = (x: unknown): x is Mode => MODES.some(([m]) => m === x)
@@ -31,6 +31,7 @@ export default function App() {
       t: q.get('t') ?? ls.t, g: q.has('g') ? q.get('g') === '1' : !!ls.g,
       og: q.has('og') ? q.get('og') !== '0' : ls.og ?? true,
       m: Number(q.get('m')) || undefined, an: ls.an ?? true,
+      hd: q.has('hd') ? q.get('hd') === '1' : ls.hd ?? false,
       playAll: q.get('play') === 'all', clips: q.get('clips') === '1',
     }
   }, [])
@@ -43,7 +44,9 @@ export default function App() {
   const [teamGoals, setTeamGoals] = useState(init.g)
   const [onlyTeam, setOnlyTeam] = useState(init.og)
   const [autoNext, setAutoNext] = useState(init.an)
+  const [hd, setHd] = useState(init.hd)
   const [playing, setPlaying] = useState<Playing>()
+  const useHd = league === 'super-lig' && hd
 
   // defaults: current season + current week (falls back to the last week, see `defaultWeek`)
   useEffect(() => {
@@ -92,7 +95,7 @@ export default function App() {
     return { week, score: `${sc.home}–${sc.away}`, logo: e.is_goal ? side?.logo : undefined, title: clipTitle(week, m, sc, e) }
   }
   const openMatch = (m: Match) => {
-    const items = matchPlaylist(m, league, seasonId!, clipMeta(m))
+    const items = matchPlaylist(m, league, seasonId!, clipMeta(m), useHd)
     if (items.length) { setPlaying({ items, index: 0, matchId: m.id }); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   }
   // goals grouped by match with running score; By team honours "Only <Team> goals"
@@ -121,14 +124,23 @@ export default function App() {
     if (mode !== 'highlights') q.set('mode', mode)
     if (teamMode && team) { q.set('t', team); if (teamGoals) { q.set('g', '1'); q.set('og', onlyTeam ? '1' : '0') } }
     if (playing?.matchId) q.set('m', String(playing.matchId))
+    if (league === 'super-lig' && hd) q.set('hd', '1')
     window.history.replaceState(null, '', `?${q}`)
-    localStorage.setItem(LS, JSON.stringify({ l: league, s: seasonId, r: round, mode, t: team, g: teamGoals, og: onlyTeam, an: autoNext } satisfies Stored))
-  }, [league, seasonId, round, mode, team, teamGoals, onlyTeam, playing, autoNext])
+    localStorage.setItem(LS, JSON.stringify({ l: league, s: seasonId, r: round, mode, t: team, g: teamGoals, og: onlyTeam, an: autoNext, hd } satisfies Stored))
+  }, [league, seasonId, round, mode, team, teamGoals, onlyTeam, playing, autoNext, hd])
   const firstRender = useRef(true)
   useEffect(() => {
     if (firstRender.current) { firstRender.current = false; return }
     setPlaying(undefined)
   }, [league, seasonId, round, mode, team, teamGoals, onlyTeam])
+  // HD only swaps the full-highlight URL; keep the player open and rebuild the playlist.
+  useEffect(() => {
+    if (!playing?.matchId || !seasonId || !list.data) return
+    const m = list.data.find(x => x.id === playing.matchId)
+    if (!m) return
+    const items = matchPlaylist(m, league, seasonId, clipMeta(m), useHd)
+    if (items.length) setPlaying(p => p && { ...p, items, index: Math.min(p.index, items.length - 1) })
+  }, [useHd])
   useEffect(() => {
     const onEsc = (e: KeyboardEvent) => e.key === 'Escape' && setPlaying(undefined)
     window.addEventListener('keydown', onEsc); return () => window.removeEventListener('keydown', onEsc)
@@ -180,6 +192,15 @@ export default function App() {
         <div className="glass flex rounded-xl p-1" role="tablist" aria-label="View">
           {MODES.map(([m, label]) => <button key={m} role="tab" aria-selected={mode === m} onClick={() => setMode(m)} className={seg(mode === m)}>{label}</button>)}
         </div>
+        {league === 'super-lig' && (
+          <button role="switch" aria-checked={hd} aria-label="HD quality" onClick={() => setHd(v => !v)}
+            className={`glass flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition hover:border-white/20 ${hd ? 'text-white' : 'text-white/60'}`}>
+            <span className={`relative h-4 w-7 rounded-full transition ${hd ? 'bg-accent' : 'bg-white/20'}`}>
+              <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition ${hd ? 'left-3.5' : 'left-0.5'}`} />
+            </span>
+            HD
+          </button>
+        )}
         {teamMode && (
           <>
             <div className="glass flex items-center gap-2 rounded-xl pl-3 text-sm">
@@ -256,6 +277,7 @@ export default function App() {
         <summary className="cursor-pointer select-none py-2 text-white/50">Help &amp; shortcuts</summary>
         <div className="mt-2 max-w-xl space-y-2 leading-relaxed">
           <p>Pick a league, season and week, then tap a match. The highlight plays on this page (same player on phones and desktop) — use fullscreen, skip, mute and PiP from the bar under the video.</p>
+          <p><b className="text-white/60">Trendyol Süper Lig HD</b> swaps the full highlight for the official beIN SPORTS Türkiye YouTube cut (1080p, remuxed in this player). Goal clips stay on the standard feed. New matchdays appear automatically.</p>
           <p><b className="text-white/60">İspanya La Liga</b> starts with the 2026/2027 season. Full-match highlights appear after each game; Goals mode stays empty until individual goal clips are published (same as Premier League).</p>
           <p>Keyboard: space / k play · ← → seek 10s · n / p next/prev · f fullscreen · m mute · c clips list · Esc close.</p>
         </div>

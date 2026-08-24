@@ -31,6 +31,7 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
 
 ## v2.6 — La Liga + polish ✅
 - Third league `İspanya La Liga`. Web: 2026/2027 highlights via LaLiga public fixtures + official LALIGA remux (`yt-dlp`/`ffmpeg`, typically 1080p50 + stereo AAC) through `/video`. Native clients expose the league; weeks stay empty until beIN publishes mp4s.
+- Web Süper Lig **HD** toggle: official beIN SPORTS Türkiye YouTube özets remuxed the same way, automatic for 2026/2027.
 - Every client built and run (emulator / simulator / headless Chrome / live server) rather than only
   read; upstream contract re-measured. Correctness and a11y fixes on web, resilience fixes on the
   server, a visible metadata bug and hot-path allocations on Android, warnings to zero on Android and

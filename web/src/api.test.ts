@@ -21,11 +21,14 @@ test('matchPlaylist handles a highlight with no events (Premier League: matchEve
 })
 
 test('matchPlaylist is the full highlight then every clip-backed event, in order', () => {
-  const m = { ...base, events: [ev(11, 25), ev(12, 61, false), ev(13, 78)] }
+  const m = { ...base, events: [ev(11, 25), ev(12, 61, false), ev(13, 78)], has_hd: true }
   const items = matchPlaylist(m, 'super-lig', 3974, meta)
   assert.deepEqual(items.map(i => i.key), ['m7', 'e11', 'e13'])   // 12 has no clip
   assert.equal(items[0].week, '3. Hafta')                          // borrowed from the first event
   assert.equal(items[1].title, "3. Hafta · 25' g11")               // meta.title wins over the default
+  const hd = matchPlaylist(m, 'super-lig', 3974, meta, true)
+  assert.equal(hd[0].src, '/video/m/7?l=super-lig&s=3974&r=3&q=hd')
+  assert.equal(hd[1].src, '/video/e/11?l=super-lig&s=3974&r=3')     // goal clips stay on the standard feed
 })
 
 test('matchPlaylist omits the highlight when there is none, and works without meta', () => {
@@ -40,5 +43,6 @@ test('clipItem falls back to the match thumbnail, and scoreline renders a missin
   assert.equal(clipItem(base, e, { league: 'super-lig', season: 3974, round: 3 }).poster, 'm.jpg')
   assert.equal(videoUrl('e', 11, { league: 'super-lig', season: 3974, round: 3 }), '/video/e/11?l=super-lig&s=3974&r=3')
   assert.equal(videoUrl('m', 102249, { league: 'ispanya-la-liga', season: 3968, round: 1 }), '/video/m/102249?l=ispanya-la-liga&s=3968&r=1')
+  assert.equal(videoUrl('m', 1515722, { league: 'super-lig', season: 3974, round: 2, hd: true }), '/video/m/1515722?l=super-lig&s=3974&r=2&q=hd')
   assert.equal(scoreline({ ...base, away: { ...base.away, score: null } }), 'Beşiktaş 1-– Eyüpspor')
 })

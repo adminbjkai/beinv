@@ -72,6 +72,9 @@ pub fn norm_name(s: &str) -> String {
             'Ú' | 'Ù' | 'Ü' | 'Û' | 'ú' | 'ù' | 'ü' | 'û' => 'u',
             'Ñ' | 'ñ' => 'n',
             'Ç' | 'ç' => 'c',
+            'Ş' | 'ş' => 's',
+            'Ğ' | 'ğ' => 'g',
+            'İ' | 'ı' => 'i',
             _ => c,
         };
         let c = c.to_ascii_lowercase();
@@ -139,7 +142,7 @@ pub fn pick_best(cands: &[YtVid], home: &str, away: &str) -> Option<String> {
         .map(|v| v.id.clone())
 }
 
-fn json_text(v: &Value) -> String {
+pub(crate) fn json_text(v: &Value) -> String {
     if let Some(s) = v.as_str() {
         return s.to_string();
     }
@@ -440,8 +443,10 @@ pub async fn fetch_week(client: &reqwest::Client, season: u64, round: u32) -> an
             away,
             thumb: format!("https://i.ytimg.com/vi/{yt}/hqdefault.jpg"),
             has_highlight: true,
+            has_hd: true,
             events: Vec::new(),
             highlight_url: format!("yt:{yt}"),
+            hd_url: format!("yt:{yt}"),
         });
     }
     out.sort_by(|a, b| a.date.cmp(&b.date));
@@ -462,6 +467,8 @@ mod tests {
         assert_eq!(norm_name("RC Celta"), "celta");
         assert_eq!(norm_name("FC Barcelona"), "barcelona");
         assert_eq!(norm_name("Elche CF"), "elche");
+        assert_eq!(norm_name("Beşiktaş"), "besiktas");
+        assert_eq!(norm_name("İstanbul"), "istanbul");
     }
 
     #[test]

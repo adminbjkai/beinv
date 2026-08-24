@@ -85,6 +85,12 @@ Header: Ocp-Apim-Subscription-Key: c13c3a8e2f6b46da9c5c425cf61fab3e
 
 Unplayed fixtures are omitted (same as beIN only listing matches that already have a highlight). Goals / By-team-Goals stay empty: there are no per-goal clips.
 
+## E. Süper Lig HD overlay (web, optional)
+
+Default Süper Lig playback is still the beIN mp4 from §C (including goal clips). The web **HD** toggle (`?q=hd` on `/video/m/{id}`, `has_hd` on the match JSON) swaps **only the full highlight** for a remux of the official [beIN SPORTS Türkiye](https://www.youtube.com/@beINSPORTSTurkiye) channel (`UCPe9vNjHF1kEExT5kHwc7aw`).
+
+Titles look like `Alanyaspor - Beşiktaş - Highlights/Özet | Trendyol Süper Lig - 2026/27` (shirt-sponsor prefixes dropped). Same automatic loop as §D: RSS + search every 5 minutes, longest matching cut, prefetch on week load, disk map `{BEINV_VIDEO_CACHE}/superlig-map.json`. Bootstrap seed: `server/src/data/superlig-youtube.json` (e.g. Beşiktaş week 2 2026/27 = `QJ31yOM88UQ`). Season id `3974` only. 1. Lig / press-conference / single-goal clips are ignored.
+
 ## Other gateway endpoints seen (not used)
 `/api/match/{id}`, `/api/match/{id}/lineups|facts|comments`, `/api/live/{id}`,
 `/api/fixture/head2head/{a}/between/{b}`, `/api/standing/teamid/{id}`.

@@ -2,7 +2,7 @@
 
 ## v2.6 — 2026-08-24
 - **İspanya La Liga** added to the league switch (all clients). Web 2026/2027 weeks list official match highlights (LaLiga fixtures + LALIGA channel, refreshed every 5 minutes for the rest of the season). The longest matching cut is used so landscape 1080p50 wins over the vertical Shorts-style duplicate. The server remuxes the highest H.264 + AAC (typically **1080p50 + stereo AAC**) to a same-origin MP4; opening a week prefetches remuxes so playback is usually instant. Falls back to 360p only if the HQ fetch fails. Goals mode is empty by data, same as Premier League. Android/tvOS list the league (seasons from beIN) and show the existing empty-week state because beIN has no La Liga mp4s.
-- Web: league chips scroll on a narrow phone; player `object-contain` + Retry overlay; Help & shortcuts at the bottom.
+- Web: league chips scroll on a narrow phone; player `object-contain` + Retry overlay; Help & shortcuts at the bottom. Trendyol Süper Lig has an **HD** toggle that plays the official beIN SPORTS Türkiye YouTube özet (1080p remux) for this season’s matches; goal clips stay on the beIN feed. New matchdays are matched automatically.
 - Polish/optimisation sweep, with every client **built and run** and the upstream contract
   re-verified live. Fixes: web's "Clips" button moved out from under the cursor mid-click so its own
   click never fired; web swallowed Space/Enter on focused buttons while the player was open;

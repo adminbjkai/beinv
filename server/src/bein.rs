@@ -67,9 +67,13 @@ pub struct Match {
     pub away: Team,
     pub thumb: String,
     pub has_highlight: bool,
+    /// YouTube HD remux available (Süper Lig `q=hd`, or La Liga's only source).
+    pub has_hd: bool,
     pub events: Vec<Event>,
     #[serde(skip)]
     pub highlight_url: String,
+    #[serde(skip)]
+    pub hd_url: String,
 }
 
 fn s(v: &Value, k: &str) -> String {
@@ -127,7 +131,9 @@ pub async fn fetch_week(client: &reqwest::Client, lg: League, season: u64, round
                 away: team(&m["awayTeam"]),
                 thumb: s(m, "highlightThumbnail"),
                 has_highlight: !highlight_url.is_empty(),
+                has_hd: false,
                 highlight_url,
+                hd_url: String::new(),
                 events: m["matchEvents"]
                     .as_array()
                     .map(|es| {
@@ -164,4 +170,6 @@ pub struct WeekQuery {
     pub l: Option<String>,
     pub s: Option<u64>,
     pub r: Option<u32>,
+    /// `hd` → play the YouTube remux when one is attached (Süper Lig HD toggle).
+    pub q: Option<String>,
 }

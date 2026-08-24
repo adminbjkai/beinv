@@ -5,7 +5,7 @@ export type Team = { name: string; logo: string; score: number | null }
 export type Event = { id: number; minute: number; description: string; is_goal: boolean; side: string | null; thumb: string; has_video: boolean }
 export type Match = {
   id: number; round: number; title: string; date: string; home: Team; away: Team; thumb: string
-  has_highlight: boolean; events: Event[]
+  has_highlight: boolean; has_hd?: boolean; events: Event[]
 }
 
 async function get<T>(url: string): Promise<T> {
@@ -24,9 +24,9 @@ export const api = {
     get<Match[]>(`/api/leagues/${league}/seasons/${season}/matches`),
 }
 
-export type Ctx = { league: string; season: number; round: number }
+export type Ctx = { league: string; season: number; round: number; hd?: boolean }
 export const videoUrl = (kind: 'm' | 'e', id: number, c: Ctx) =>
-  `/video/${kind}/${id}?l=${c.league}&s=${c.season}&r=${c.round}`
+  `/video/${kind}/${id}?l=${c.league}&s=${c.season}&r=${c.round}${c.hd && kind === 'm' ? '&q=hd' : ''}`
 
 /** One entry of the player's playlist: the full highlight or a single clip. */
 export type PlaylistItem = {
@@ -37,14 +37,14 @@ export type PlaylistItem = {
 export type ClipMeta = { week?: string; score?: string; logo?: string; title?: string }
 
 /** `meta.title` overrides the default title (App passes the canonical §2b title with the week label). */
-export const matchPlaylist = (m: Match, league: string, season: number, meta?: (e: Event) => ClipMeta): PlaylistItem[] => {
-  const c = { league, season, round: m.round }
+export const matchPlaylist = (m: Match, league: string, season: number, meta?: (e: Event) => ClipMeta, hd = false): PlaylistItem[] => {
+  const c = { league, season, round: m.round, hd: hd && !!m.has_hd }
   const items: PlaylistItem[] = []
   // `meta` is keyed by event, so the highlight borrows the first event's week label.
   // Premier League matches arrive with `matchEvents: null` (UPSTREAM_API.md §B) — no events, no label.
   const first: Event | undefined = m.events[0]
   if (m.has_highlight) items.push({ key: `m${m.id}`, src: videoUrl('m', m.id, c), poster: m.thumb, title: m.title, match: m, week: first && meta?.(first)?.week })
-  for (const e of m.events) if (e.has_video) items.push(clipItem(m, e, c, meta?.(e)))
+  for (const e of m.events) if (e.has_video) items.push(clipItem(m, e, { ...c, hd: false }, meta?.(e)))
   return items
 }
 
