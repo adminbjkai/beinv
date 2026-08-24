@@ -63,6 +63,9 @@ async fn load_week(app: &App, lg: League, season: u64, round: u32) -> anyhow::Re
             for m in &ms {
                 if !m.highlight_url.is_empty() {
                     app.sources.insert(format!("m:{}", m.id), m.highlight_url.clone()).await;
+                    if let Some(yt) = m.highlight_url.strip_prefix("yt:") {
+                        youtube::warm(yt);
+                    }
                 }
                 for e in m.events.iter().filter(|e| e.has_video) {
                     app.sources.insert(format!("e:{}", e.id), e.mp4.clone()).await;

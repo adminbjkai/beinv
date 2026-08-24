@@ -34,6 +34,7 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   const [waiting, setWaiting] = useState(false)
   const [clips, setClips] = useState(initialClips)
   const [err, setErr] = useState(false)
+  const [prep, setPrep] = useState(false)
   const drawer = useRef<HTMLElement>(null)
   const clipsBtn = useRef<HTMLButtonElement>(null)
   const clipsRef = useRef(clips)
@@ -103,9 +104,11 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
 
   // new item → reset display state and start playback
   useEffect(() => {
-    setTime(0); setDur(0); setBuffered(0); setErr(false); poke()
+    setTime(0); setDur(0); setBuffered(0); setErr(false); setPrep(false); poke()
+    const t = window.setTimeout(() => setPrep(true), 1200)
     const el = v.current
     if (el) el.play().catch(() => {})
+    return () => window.clearTimeout(t)
   }, [item.key, poke])
 
   useEffect(() => {
@@ -153,13 +156,14 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   return (
     <div ref={wrap} onMouseMove={poke} onMouseLeave={() => playing && !clips && setShow(false)}
       className="group relative aspect-video w-full overflow-hidden rounded-2xl bg-black shadow-[0_30px_80px_-20px_rgba(0,0,0,.8)] select-none">
-      <video ref={v} src={item.src} poster={item.poster} autoPlay playsInline preload="metadata"
+      <video ref={v} src={item.src} poster={item.poster} autoPlay playsInline preload="auto"
         onClick={toggle} onDoubleClick={fullscreen} onError={() => setErr(true)}
         className="h-full w-full bg-black object-contain" />
 
       {waiting && !err && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3">
           <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-accent" />
+          {prep && <p className="text-sm font-medium text-white/70">Preparing highlight…</p>}
         </div>
       )}
 

@@ -32,10 +32,18 @@ struct SeasonDump {
     matches: Arc<Vec<Value>>,
 }
 
+/// One official highlight candidate. `secs` is used to prefer the landscape cut
+/// (~3:15) over the vertical Shorts-style cut (~2:48) of the same match.
+#[derive(Clone, Debug)]
+pub struct YtVid {
+    pub id: String,
+    pub title: String,
+    pub secs: u32,
+}
+
 struct YtIndex {
     loaded: Instant,
-    /// normalized title → video id (official RESUMEN/HIGHLIGHTS only)
-    by_title: Vec<(String, String, String)>, // (id, title, norm_title)
+    videos: Vec<YtVid>,
 }
 
 static SEASON: Mutex<Option<SeasonDump>> = Mutex::const_new(None);
@@ -109,6 +117,51 @@ pub fn title_matches(title: &str, home: &str, away: &str) -> bool {
     !h.is_empty() && !a.is_empty() && t.contains(&h) && t.contains(&a)
 }
 
+/// "3:15" / "2:48" → seconds. Empty/junk → 0.
+pub fn parse_clock(s: &str) -> u32 {
+    let s = s.trim();
+    if s.is_empty() {
+        return 0;
+    }
+    let mut n = 0u32;
+    for p in s.split(':') {
+        n = n.saturating_mul(60).saturating_add(p.parse().unwrap_or(0));
+    }
+    n
+}
+
+/// Longest matching highlight (landscape cuts run ~20–30 s longer than the vertical ones).
+pub fn pick_best(cands: &[YtVid], home: &str, away: &str) -> Option<String> {
+    cands
+        .iter()
+        .filter(|v| title_matches(&v.title, home, away))
+        .max_by_key(|v| v.secs)
+        .map(|v| v.id.clone())
+}
+
+fn json_text(v: &Value) -> String {
+    if let Some(s) = v.as_str() {
+        return s.to_string();
+    }
+    if let Some(s) = v.get("simpleText").and_then(Value::as_str) {
+        return s.to_string();
+    }
+    v.get("runs")
+        .and_then(Value::as_array)
+        .map(|rs| {
+            rs.iter()
+                .filter_map(|r| r.get("text").and_then(Value::as_str))
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .unwrap_or_default()
+}
+
+fn map_path() -> std::path::PathBuf {
+    let dir = std::env::var("BEINV_VIDEO_CACHE").unwrap_or_else(|_| "/tmp/beinv-yt".into());
+    std::path::PathBuf::from(dir).join("laliga-map.json")
+}
+
 fn s(v: &Value, k: &str) -> String {
     v.get(k).and_then(Value::as_str).unwrap_or("").to_string()
 }
@@ -165,28 +218,61 @@ async fn load_season(client: &reqwest::Client) -> anyhow::Result<Arc<Vec<Value>>
     Ok(arc)
 }
 
+fn load_persisted() -> HashMap<u64, String> {
+    let mut m = seed_map();
+    if let Ok(s) = std::fs::read_to_string(map_path()) {
+        if let Ok(p) = serde_json::from_str::<HashMap<String, String>>(&s) {
+            for (k, v) in p {
+                if let Ok(id) = k.parse::<u64>() {
+                    if crate::youtube::valid_id(&v) {
+                        m.insert(id, v);
+                    }
+                }
+            }
+        }
+    }
+    m
+}
+
 async fn known_ids() -> HashMap<u64, String> {
     let mut g = BY_MATCH.lock().await;
     if g.is_none() {
-        *g = Some(seed_map());
+        *g = Some(load_persisted());
     }
     g.as_ref().unwrap().clone()
 }
 
 async fn remember(id: u64, yt: String) {
-    let mut g = BY_MATCH.lock().await;
-    g.get_or_insert_with(seed_map).insert(id, yt);
+    let snap = {
+        let mut g = BY_MATCH.lock().await;
+        let m = g.get_or_insert_with(load_persisted);
+        m.insert(id, yt);
+        m.clone()
+    };
+    tokio::task::spawn_blocking(move || {
+        let mut out = HashMap::new();
+        for (k, v) in snap {
+            out.insert(k.to_string(), v);
+        }
+        if let Ok(s) = serde_json::to_string(&out) {
+            let path = map_path();
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(path, s);
+        }
+    });
 }
 
-async fn load_yt_index(client: &reqwest::Client) -> Vec<(String, String, String)> {
+async fn load_yt_index(client: &reqwest::Client) -> Vec<YtVid> {
     let mut g = YT.lock().await;
     if let Some(c) = g.as_ref() {
-        if c.loaded.elapsed() < Duration::from_secs(900) {
-            return c.by_title.clone();
+        if c.loaded.elapsed() < Duration::from_secs(300) {
+            return c.videos.clone();
         }
     }
-    let mut items: Vec<(String, String, String)> = Vec::new();
-    // RSS — latest ~15 uploads on the official channel
+    let mut items: Vec<YtVid> = Vec::new();
+    // RSS — latest ~15 uploads on the official channel (includes duration)
     if let Ok(xml) = async {
         let r = client.get(RSS).send().await?.error_for_status()?;
         r.text().await
@@ -206,13 +292,18 @@ async fn load_yt_index(client: &reqwest::Client) -> Vec<(String, String, String)
                 .and_then(|s| s.split("</media:title>").next())
                 .unwrap_or("")
                 .to_string();
+            let secs = block
+                .split("<yt:duration seconds=\"")
+                .nth(1)
+                .and_then(|s| s.split('"').next())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
             if !id.is_empty() && is_highlight_title(&title) {
-                let n = norm_name(&title);
-                items.push((id, title, n));
+                items.push(YtVid { id, title, secs });
             }
         }
     }
-    // Innertube search — broader than RSS, still the official "RESUMEN LALIGA EA SPORTS" titles
+    // Innertube search — latest official RESUMEN/HIGHLIGHTS with clock in lengthText
     let body = serde_json::json!({
         "context": { "client": { "clientName": "WEB", "clientVersion": "2.20260101.00.00", "hl": "en" } },
         "query": "RESUMEN LALIGA EA SPORTS",
@@ -233,41 +324,23 @@ async fn load_yt_index(client: &reqwest::Client) -> Vec<(String, String, String)
     {
         walk_videos(&v, &mut items);
     }
-    // de-dupe by video id, keep first
     let mut seen = std::collections::HashSet::new();
-    items.retain(|(id, _, _)| seen.insert(id.clone()));
+    // Keep the copy with the higher duration when the same id appears twice.
+    items.sort_by_key(|v| std::cmp::Reverse(v.secs));
+    items.retain(|v| seen.insert(v.id.clone()));
     tracing::info!("laliga youtube index {} highlights (channel {YT_CHANNEL})", items.len());
-    *g = Some(YtIndex { loaded: Instant::now(), by_title: items.clone() });
+    *g = Some(YtIndex { loaded: Instant::now(), videos: items.clone() });
     items
 }
 
-fn walk_videos(v: &Value, out: &mut Vec<(String, String, String)>) {
+fn walk_videos(v: &Value, out: &mut Vec<YtVid>) {
     match v {
         Value::Object(m) => {
             if let Some(id) = m.get("videoId").and_then(Value::as_str) {
-                let title = m
-                    .get("title")
-                    .map(|t| {
-                        if let Some(s) = t.as_str() {
-                            s.to_string()
-                        } else if let Some(s) = t.get("simpleText").and_then(Value::as_str) {
-                            s.to_string()
-                        } else {
-                            t.get("runs")
-                                .and_then(Value::as_array)
-                                .map(|rs| {
-                                    rs.iter()
-                                        .filter_map(|r| r.get("text").and_then(Value::as_str))
-                                        .collect::<Vec<_>>()
-                                        .join("")
-                                })
-                                .unwrap_or_default()
-                        }
-                    })
-                    .unwrap_or_default();
+                let title = m.get("title").map(json_text).unwrap_or_default();
+                let secs = m.get("lengthText").map(|t| parse_clock(&json_text(t))).unwrap_or(0);
                 if is_highlight_title(&title) {
-                    let n = norm_name(&title);
-                    out.push((id.to_string(), title, n));
+                    out.push(YtVid { id: id.to_string(), title, secs });
                 }
             }
             for x in m.values() {
@@ -281,10 +354,6 @@ fn walk_videos(v: &Value, out: &mut Vec<(String, String, String)>) {
         }
         _ => {}
     }
-}
-
-fn lookup<'a>(index: &'a [(String, String, String)], home: &str, away: &str) -> Option<&'a str> {
-    index.iter().find(|(_, title, _)| title_matches(title, home, away)).map(|(id, _, _)| id.as_str())
 }
 
 async fn search_one(client: &reqwest::Client, home: &str, away: &str) -> Option<String> {
@@ -308,7 +377,7 @@ async fn search_one(client: &reqwest::Client, home: &str, away: &str) -> Option<
         .ok()?;
     let mut items = Vec::new();
     walk_videos(&v, &mut items);
-    lookup(&items, home, away).map(str::to_string)
+    pick_best(&items, home, away)
 }
 
 /// Matches of one beIN week that have a published official highlight.
@@ -338,12 +407,17 @@ pub async fn fetch_week(client: &reqwest::Client, season: u64, round: u32) -> an
         if status != "FullTime" {
             continue;
         }
-        let yt = if let Some(id) = known.get(&id) {
-            Some(id.clone())
-        } else if let Some(id) = lookup(&index, &home_name, &away_name) {
-            Some(id.to_string())
-        } else {
-            search_one(client, &home_name, &away_name).await
+        // Live index wins over the seed: landscape cuts are ~20 s longer than the
+        // vertical ones of the same match, so pick_best prefers them. Seed/disk
+        // map is only the fallback when the video is not in the current RSS/search.
+        let yt = pick_best(&index, &home_name, &away_name);
+        let yt = match yt {
+            Some(id) => Some(id),
+            None => known.get(&id).cloned(),
+        };
+        let yt = match yt {
+            Some(id) => Some(id),
+            None => search_one(client, &home_name, &away_name).await,
         };
         let Some(yt) = yt else { continue };
         known.insert(id, yt.clone());
@@ -429,6 +503,22 @@ mod tests {
         let m = seed_map();
         assert_eq!(m.len(), 14);
         assert_eq!(m.get(&102249).unwrap(), "9WlsPzrTSqU");
-        assert_eq!(m.get(&102262).unwrap(), "9XiG_TtRGlI");
+        assert_eq!(m.get(&102262).unwrap(), "jV-hxmJQKfc");
+        assert_eq!(m.get(&102260).unwrap(), "eDzd_2_7vzI");
+    }
+
+    #[test]
+    fn pick_best_prefers_the_longer_landscape_cut() {
+        let title = "ATLÉTICO DE MADRID 2 - 2 VILLARREAL CF | RESUMEN LALIGA EA SPORTS";
+        let cands = [
+            YtVid { id: "4dPE5OkzbeQ".into(), title: title.into(), secs: 169 },
+            YtVid { id: "eDzd_2_7vzI".into(), title: title.into(), secs: 194 },
+        ];
+        assert_eq!(
+            pick_best(&cands, "Atlético de Madrid", "Villarreal CF").as_deref(),
+            Some("eDzd_2_7vzI")
+        );
+        assert_eq!(parse_clock("3:15"), 195);
+        assert_eq!(parse_clock("2:48"), 168);
     }
 }

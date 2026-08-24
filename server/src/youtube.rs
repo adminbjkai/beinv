@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 
 /// `yt:` + 11-char id, as stored on La Liga matches.
 pub fn video_id(url: &str) -> Option<&str> {
@@ -25,6 +25,21 @@ fn cache_dir() -> PathBuf {
 }
 
 static JOBS: Mutex<Option<HashMap<String, Arc<Mutex<()>>>>> = Mutex::const_new(None);
+static WARM: Semaphore = Semaphore::const_new(2);
+
+/// Start a background remux so the first click on a week is usually instant.
+pub fn warm(id: &str) {
+    if !valid_id(id) {
+        return;
+    }
+    let id = id.to_string();
+    tokio::spawn(async move {
+        let Ok(_p) = WARM.acquire().await else { return };
+        if let Err(e) = ensure_mp4(&id).await {
+            tracing::warn!("prefetch {id}: {e}");
+        }
+    });
+}
 
 async fn job_lock(id: &str) -> Arc<Mutex<()>> {
     let mut g = JOBS.lock().await;

@@ -73,9 +73,15 @@ Header: Ocp-Apim-Subscription-Key: c13c3a8e2f6b46da9c5c425cf61fab3e
 
 380 matches, `gameweek.week` = 1…38, `status` `FullTime` | `PreMatch`, team shields on `home_team.shield.url`.
 
-**Highlights** are the official [LALIGA YouTube channel](https://www.youtube.com/@LaLiga) (`UCTv-XvfzLX3i4IGWAm4sbmA`) videos titled `HOME s - s AWAY | RESUMEN LALIGA EA SPORTS` (or `HIGHLIGHTS`). Matched by normalised team names. Seed of the opening matchweeks lives in `server/src/data/laliga-youtube.json`; the server also reads the channel RSS and a YouTube search so later weeks fill in without a redeploy.
+**Highlights** are the official [LALIGA YouTube channel](https://www.youtube.com/@LaLiga) (`UCTv-XvfzLX3i4IGWAm4sbmA`) videos titled `HOME s - s AWAY | RESUMEN LALIGA EA SPORTS` (or `HIGHLIGHTS`). This is automatic for the whole season — the same “publish then appear” rhythm as beIN for Süper Lig / Premier League:
 
-**Playback** (`/video/m/{matchId}`): `yt-dlp -f "bv*[vcodec^=avc1]+ba[ext=m4a]/18/b"` takes the highest H.264+AAC the source publishes (typically **1080p50 + stereo AAC** for landscape highlights; vertical clips max out around 608×1080). `ffmpeg -c copy -movflags +faststart` remuxes to `{BEINV_VIDEO_CACHE}/{youtubeId}.hq.mp4`. If the HQ fetch fails, it falls back to progressive 360p so the player still starts. The `<video>` element only ever loads `/video/…`. First HQ request can take ~20–40 s; later Range hits are cached.
+1. Every 5 minutes the server re-reads LaLiga fixtures (`FullTime` + score).
+2. The same interval it refreshes the official-channel RSS plus a YouTube search.
+3. A `FullTime` match is listed once a matching highlight exists. The **longest** matching cut is used so the landscape ~3:15 version wins over the vertical ~2:48 Shorts-style cut of the same game.
+4. Opening a week **prefetches** remuxes in the background (2 at a time), so tapping a card is usually instant. The first ever fetch of a brand-new video can still take ~15 s.
+5. Match→video ids are remembered in `{BEINV_VIDEO_CACHE}/laliga-map.json` across restarts. `server/src/data/laliga-youtube.json` is only a bootstrap for the opening matchweeks, not a season-long hardcoded list.
+
+**Playback** (`/video/m/{matchId}`): `yt-dlp -f "bv*[vcodec^=avc1]+ba[ext=m4a]/18/b"` takes the highest H.264+AAC the source publishes (typically **1080p50 + stereo AAC**). Merger uses `+faststart`. If the HQ fetch fails, it falls back to progressive 360p so the player still starts. The `<video>` element only ever loads `/video/…`.
 
 Unplayed fixtures are omitted (same as beIN only listing matches that already have a highlight). Goals / By-team-Goals stay empty: there are no per-goal clips.
 
