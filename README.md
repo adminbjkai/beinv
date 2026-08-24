@@ -53,7 +53,7 @@ Signing uses a free personal team, so the install expires after 7 days — re-ru
 
 ## Android app (`android/`)
 
-v2.7 source is on `main`; a **debug APK has been assembled** on this Mac (v2.7.1). Device/emulator checklist: [docs/NATIVE_RESUME.md](docs/NATIVE_RESUME.md).
+v2.7.1 debug APK assembled and walked on Pixel_9. Checklist: [docs/NATIVE_RESUME.md](docs/NATIVE_RESUME.md).
 
 - minSdk 26, Jetpack Compose + Material3 dark theme (same charcoal/emerald palette), Media3 ExoPlayer with cross-protocol redirects enabled so `highlightVideoUrl` plays directly. HD / La Liga full highlights play from `https://beinv.bjk.ai/video/…`.
 - Browse: league segmented buttons, season dropdown, HD switch, left week rail (All weeks + rounds; chips on a phone), 2-column card grid (3 on wide screens). Tap a card → player with a clip list (full highlight + goals/positions).
