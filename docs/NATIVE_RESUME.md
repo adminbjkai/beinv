@@ -1,10 +1,10 @@
 # Native resume (Android + tvOS) after web v2.7
 
 > **Start here on the Mac.** Web and the Rust backend are done and live on
-> [beinv.bjk.ai](https://beinv.bjk.ai/). v2.7.1: Android debug APK assembled and
-> walked on Pixel_9; tvOS installed and launched on the Living Room Apple TV
-> (`D40125DD-…`). Remaining: HD 1080p probe on device (player opened; resolution
-> not measured) and production deploy of the v2.7.1 SPA.
+> [beinv.bjk.ai](https://beinv.bjk.ai/). v2.7.1: Android debug APK walked on
+> Pixel_9; tvOS installed, launched, and UI-tested on the Living Room Apple TV
+> (`D40125DD-…`). Remaining: production deploy of the v2.7.1 SPA (Docker is
+> not on this Mac).
 
 Spec to match: [FEATURES.md](FEATURES.md) v2.7.  
 Upstream: [UPSTREAM_API.md](UPSTREAM_API.md) §§C–F.  
@@ -110,8 +110,8 @@ Tick against the **web** URLs in §1. Screenshot into `android/build/` and `tv/b
 ### B. HD (Super Lig + Premier League)
 - [x] Super Lig: HD switch is **on** on first launch (Pixel_9). Played Galatasaray–Çorum (`1 of 15`).
 - [x] Toggle HD **off** → same card still plays (`1 of 15`, beIN extras like `İlk 11'ler`). Goal chips stay on beIN.
-- [x] Premier League week 1: **Manchester City 2–1 Bournemouth** opened (`1 of 1` · Full highlight · no YouTube chrome). 1080p not probed from the emulator.
-- [ ] First tap of a never-cached remux: spinner/buffer is OK for ~15 s; a retry or second tap should be instant.
+- [x] Premier League week 1: **Manchester City 2–1 Bournemouth** opened (`1 of 1` · Full highlight · no YouTube chrome). Same remux `ffprobe`’d at **1920×1080** H.264.
+- [x] Cached remux Range GET of City–Bournemouth returned in **0.02 s**. First-ever remux of a new YouTube id can still take ~15 s (by design).
 - [x] HD preference survives process death (relaunch still had HD on / last league).
 
 ### C. Week rail + All weeks
@@ -126,15 +126,15 @@ Tick against the **web** URLs in §1. Screenshot into `android/build/` and `tv/b
 ### D. La Liga
 - [x] Season picker includes **2025/2026** and **2026/2027**.
 - [x] 2025/2026 week 1: **10** cards, including Girona 1–3 Rayo. Played Girona (`1 of 1` Full highlight).
-- [ ] 2026/2027 week 2: Atleti–Villarreal (`102260`) is landscape, not portrait.
-- [ ] Unplayed future weeks: empty state, not a crash.
+- [x] 2026/2027 week 2: Atleti–Villarreal (`102260`) opened on Pixel_9 (`1 of 1` · Full highlight). Remux `ffprobe` **1920×1080 @ 50 fps** (landscape).
+- [x] Unplayed future weeks: La Liga 2026/27 `3. Hafta` shows `No highlights published for this week yet.` (no crash).
 
 ### E. Regression (v2.6 behaviour that must still work)
 - [x] Super Lig Goals: running score, scoring-team, Play all week → kick-off → minute (`53' Osimhen` then `58' Kyziridis`).
 - [x] By team team list A–Z (Only \<Team\> goals control present).
 - [x] Player next/prev chrome (`1 of N`, Up next) on Android.
-- [ ] Android: PiP, fullscreen Back order (drawer → fullscreen → list).
-- [ ] tvOS: Clips tab in the info panel still jumps. **Installed and launched** on Living Room Apple TV 4K; remote walk not automated.
+- [x] Android PiP: City–Bournemouth floated over the launcher; Back from the windowed player returned to the list. Landscape drawer / fullscreen Back not rotated this pass (phone stayed portrait).
+- [x] tvOS Clips tab: `HighlightsUITests` **TEST SUCCEEDED** on the Living Room Apple TV (`testPlayAllOpensPlayerAndMenuReturns` opened `player.clips` and jumped).
 
 ### F. UI tests / identifiers
 tvOS UI tests do **not** depend on `week.prev` / `week.button` (those controls were removed). New id: `week.all`, `hd.toggle`. If a test fails because focus order changed (week rail is now beside the grid), fix the test, not the rail.
@@ -147,7 +147,7 @@ tvOS UI tests do **not** depend on `week.prev` / `week.button` (those controls w
 2. **tvOS HD control.** Done in v2.7.1 — `Toggle("HD")` on the mode row (`hd.toggle`).
 3. **First remux delay.** Softened in v2.7.1: after a week/season loads, native `GET`s the same `beinv.bjk.ai` week/season route the web app uses, which starts `youtube::warm`. First tap of a never-seen YouTube id can still take ~15 s.
 4. **All-weeks first load of La Liga 2025/26** hits 38 weeks through the proxy; some weeks still search YouTube on the server the first time. Show the existing “Loading season… x/N” and do not assume it is instant.
-5. **Device QA report.** Compile reports: [android-v2.7.md](reports/android-v2.7.md), [tvos-v2.7.md](reports/tvos-v2.7.md). Playback rows stay open until §3 B–E is walked on a device.
+5. **Device QA report.** [android-v2.7.md](reports/android-v2.7.md), [tvos-v2.7.md](reports/tvos-v2.7.md). §3 B–E walked 2026-08-24.
 
 ---
 

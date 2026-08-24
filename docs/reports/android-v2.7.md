@@ -21,7 +21,7 @@
 |---|---|
 | `assembleDebug` | **PASS** (2026-08-24, after week-header + warm changes) |
 | Warnings | not re-counted this pass |
-| Install / play | **PASS browse** on Pixel_9 emulator (`adb install -r` + `am start`). Player opened on La Liga Alavés–Getafe (`Full highlight` · `1 of 1`). HD URL / 1080p not measured. |
+| Install / play | **PASS** on Pixel_9: HD on/off, City–Bournemouth **1920×1080**, La Liga 2025/26 + 2026/27 Atleti, empty week, Goals Play all, PiP |
 
 ## Emulator browse (Pixel_9, 2026-08-24)
 
@@ -31,5 +31,8 @@ Walked with `uiautomator` + screenshots in `android/build/`:
 - Premier League switch shows week-1 cards (Arsenal–Coventry, …). HD still on the mode row.
 - La Liga 2026/2027: HD hidden; `Loading season… 0/38` then cards; header `1. Hafta · 6 matches` (Alavés–Getafe, Sevilla–Rayo, …). Shot: `v27-laliga-allweeks.png`.
 - Tap Alavés–Getafe → player `Full highlight` / `1 of 1` / PiP.
+- HD **off** Super Lig still plays beIN extras; HD **on** City–Bournemouth is the remux (`ffprobe` 1920×1080). PiP floats over the launcher; Back from the player returns to the list.
+- La Liga 2025/2026 week 1: 10 cards, Girona played. 2026/2027 week 2: Atleti–Villarreal opened (`1 of 1`). Week 3 empty: `No highlights published for this week yet.`
+- Goals: Super Lig `Play all · 43 goals · from 1. Hafta`. By team A–Z.
 
-Still open vs [NATIVE_RESUME.md](../NATIVE_RESUME.md) §3: HD off → beIN mp4; City–Bournemouth 1080p; La Liga 2025/2026 season `3850`; Goals / By team / Play all regression.
+See [NATIVE_RESUME.md](../NATIVE_RESUME.md) §3.

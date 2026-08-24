@@ -21,11 +21,9 @@
 |---|---|
 | Simulator `xcodebuild` | **PASS** (2026-08-24, after header / Toggle / retry / warm) |
 | `HighlightsTests` | **PASS** — `xcodebuild test -only-testing:HighlightsTests` **TEST SUCCEEDED** |
-| `HighlightsUITests` | **not re-run** this pass (needs booted simulator + network) |
-| Device install | **PASS** — Living Room Apple TV 4K (`D40125DD-4206-59B9-8D73-9BA5D3E59069`): `devicectl device install app` + `process launch` → process `Highlights` pid 4640 |
+| `HighlightsUITests` | **PASS** on Living Room Apple TV (`id=da4ce9a44c8732b0fbba7320f2a099ebdcf90d82`) — 2 tests, 0 failures, **TEST SUCCEEDED** |
+| Device install | **PASS** — Living Room Apple TV 4K (`D40125DD-4206-59B9-8D73-9BA5D3E59069`): reinstalled + launched after the v2.7.1 build |
 
-## Device checklist (still open)
+## Device checklist
 
-See [NATIVE_RESUME.md](../NATIVE_RESUME.md) §3 B–E and §F. Clips-tab jump (v2.4) must still work.
-
-Do not flip FEATURES “verified” until those rows are walked.
+Walked on the Living Room Apple TV: Play all opens the player, Clips tab is reachable (`player.clips`), Menu returns to Goals. See [NATIVE_RESUME.md](../NATIVE_RESUME.md) §3.
