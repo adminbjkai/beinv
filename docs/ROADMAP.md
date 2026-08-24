@@ -37,10 +37,13 @@ Status legend: ✅ done · 🔨 in progress · ⏳ planned
   server, a visible metadata bug and hot-path allocations on Android, warnings to zero on Android and
   tvOS ([reports/review-v2.6.md](reports/review-v2.6.md)).
 
-## v2.7 — Premier HD, all-weeks, La Liga 2025/26 ✅ web / 🔨 native binaries
+## v2.7 — Premier HD, all-weeks, La Liga 2025/26 ✅ web / ✅ native source
 - Premier League HD from official NBC Sports; HD default on for Super Lig + PL.
-- Left week rail + All weeks highlights view; La Liga 2025/2026 overlay; native source plays HD/La Liga via `beinv.bjk.ai`.
-- **Web verified live.** Android + tvOS **source is on `main` but not built** — continue from [NATIVE_RESUME.md](NATIVE_RESUME.md) on a Mac with Android Studio + Xcode.
+- Left week rail + All weeks highlights view; La Liga 2025/2026 overlay; native plays HD/La Liga via `beinv.bjk.ai`.
+- **Web verified live.** Android Pixel_9 QA + tvOS Living Room Apple TV install: [NATIVE_RESUME.md](NATIVE_RESUME.md).
+
+## v2.7.1 — native parity polish ✅
+- Week section headers on Android/tvOS; web HD remembered; week-rail scroll + `[`/`]`; remux warm from native; Apple TV device install.
 
 ## v3 ⏳
 - Favourite team: app opens on that team's latest highlights.

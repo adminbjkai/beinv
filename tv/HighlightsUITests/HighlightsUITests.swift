@@ -74,11 +74,13 @@ final class HighlightsUITests: XCTestCase {
         guard NSPredicate(format: "enabled == true").wait(for: playAll, timeout: 30) else {
             throw XCTSkip("no goal clips in the default week — nothing to play")
         }
-        // Play all is right-aligned in the row under the mode bar: go down into the grid, right to the last column, then up.
+        // Play all sits on the row under the mode bar (right). The week rail is left of the grid.
         let cardFocused = { app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.'")).allElementsBoundByIndex.contains { $0.hasFocus } }
-        XCTAssertTrue(press(.down) { cardFocused() || playAll.hasFocus }, "could not reach the goals grid")
+        let weekRail = { app.buttons["week.all"].hasFocus || app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'week.'")).allElementsBoundByIndex.contains { $0.hasFocus } }
+        XCTAssertTrue(press(.down) { cardFocused() || playAll.hasFocus || weekRail() }, "could not reach Play all / grid / week rail")
+        if weekRail() { press(.right, max: 4) { playAll.hasFocus || cardFocused() } }
         if !playAll.hasFocus { press(.right, max: 2) { false }; press(.up) { playAll.hasFocus } }
-        XCTAssertTrue(playAll.hasFocus || press(.right) { playAll.hasFocus }, "could not focus Play all")
+        XCTAssertTrue(playAll.hasFocus || press(.right) { playAll.hasFocus } || press(.up) { playAll.hasFocus }, "could not focus Play all")
         remote.press(.select)
 
         let player = app.descendants(matching: .any)["player.view"]

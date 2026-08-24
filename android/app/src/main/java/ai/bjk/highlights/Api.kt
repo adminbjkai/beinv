@@ -93,4 +93,18 @@ object Api {
         seasonMatchesCache[key] = result
         return result
     }
+
+    /**
+     * Ask the remux host to load the same week/season the user is browsing.
+     * That populates `/video` sources and starts YouTube remux warm so the
+     * first HD tap is usually instant. Failures are ignored.
+     */
+    suspend fun warm(league: League, seasonId: Int, round: Int? = null) {
+        val url = if (round == null) {
+            "$BEINV/api/leagues/${league.id}/seasons/$seasonId/matches"
+        } else {
+            "$BEINV/api/leagues/${league.id}/seasons/$seasonId/weeks/$round"
+        }
+        runCatching { get(url) }
+    }
 }

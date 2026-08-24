@@ -6,9 +6,9 @@ All three clients (web, Android, Apple TV) implement the same feature set with p
 
 | Client | v2.7 features | Built / run |
 |---|---|---|
-| **Web + Rust server** | Done and live on [beinv.bjk.ai](https://beinv.bjk.ai/) | Yes — browser + API |
-| **Android** | Source on `main` (`BrowseScreen` week rail, HD default, La Liga via remux host) | **No** — resume on Mac: [NATIVE_RESUME.md](NATIVE_RESUME.md) |
-| **tvOS** | Source on `main` (`weekRail`, HD, La Liga via remux host) | **No** — same resume doc |
+| **Web + Rust server** | v2.7 (Premier HD, All weeks, La Liga 2025/26) is live on [beinv.bjk.ai](https://beinv.bjk.ai/). **v2.7.1** in this checkout (HD last-used from storage, week-rail scroll, `[` / `]` week keys) is **not deployed** yet. | v2.7 live · v2.7.1 local |
+| **Android** | Week rail, week headers, HD default, La Liga via remux host, remux warm. | **APK built + Pixel_9 QA** (HD on/off, City–Bournemouth, La Liga 2025/26, Goals Play all) |
+| **tvOS** | `weekRail`, week headers, HD `Toggle`, La Liga via remux host, remux warm. | **Installed and launched on Living Room Apple TV 4K** — Clips-tab remote walk still open |
 
 Native is a compile-and-verify job, not a green-field port. Do not re-implement matching/remux on device.
 

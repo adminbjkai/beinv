@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { api, clipItem, matchPlaylist, type Match, type Event, type PlaylistItem, type Week } from './api'
 import MatchCard from './components/MatchCard'
 import GoalsGrid from './components/GoalsGrid'
@@ -15,6 +15,7 @@ const LS = 'beinv.v2'
 const stored = (): Stored => { try { return JSON.parse(localStorage.getItem(LS) ?? '{}') } catch { return {} } }
 const isMode = (x: unknown): x is Mode => MODES.some(([m]) => m === x)
 const HD_LEAGUES = new Set(['super-lig', 'ingiltere-premier-ligi'])
+const EMPTY_WEEKS: Week[] = []
 /** FEATURES §1: default week is all-weeks for Highlights/Goals; By team has no week. */
 const parseRound = (raw: string | null | undefined): RoundSel | undefined => {
   if (raw == null || raw === '') return undefined
@@ -39,8 +40,8 @@ export default function App() {
       t: q.get('t') ?? ls.t, g: q.has('g') ? q.get('g') === '1' : !!ls.g,
       og: q.has('og') ? q.get('og') !== '0' : ls.og ?? true,
       m: Number(q.get('m')) || undefined, an: ls.an ?? true,
-      // HD is the default for Super Lig + Premier League. URL hd=0 turns it off.
-      hd: q.has('hd') ? q.get('hd') === '1' : true,
+      // HD is the default for Super Lig + Premier League. URL wins; else last choice; else on.
+      hd: q.has('hd') ? q.get('hd') === '1' : ls.hd ?? true,
       playAll: q.get('play') === 'all', clips: q.get('clips') === '1',
     }
   }, [])
@@ -76,12 +77,14 @@ export default function App() {
     queryKey: ['week', league, seasonId, round],
     queryFn: () => api.week(league, seasonId!, round as number),
     enabled: !!seasonId && typeof round === 'number' && !teamMode,
+    placeholderData: keepPreviousData,
   })
   const all = useQuery({
     queryKey: ['season', league, seasonId],
     queryFn: () => api.seasonMatches(league, seasonId!),
     enabled: !!seasonId && (teamMode || allWeeks),
     staleTime: 10 * 60_000,
+    placeholderData: keepPreviousData,
   })
   const list = teamMode || allWeeks ? all : week
 
@@ -169,8 +172,32 @@ export default function App() {
     const onEsc = (e: KeyboardEvent) => e.key === 'Escape' && setPlaying(undefined)
     window.addEventListener('keydown', onEsc); return () => window.removeEventListener('keydown', onEsc)
   }, [])
+  const weeks = season?.weeks ?? EMPTY_WEEKS
+  const stepWeek = useCallback((delta: number) => {
+    if (teamMode) return
+    const rounds = weeks.map(w => w.round)
+    if (round === 'all') {
+      if (delta > 0 && rounds[0] != null) setRound(rounds[0])
+      return
+    }
+    const i = rounds.indexOf(round as number)
+    if (i < 0) return
+    const j = i + delta
+    if (j < 0) setRound('all')
+    else if (j < rounds.length) setRound(rounds[j])
+  }, [teamMode, weeks, round])
+  useEffect(() => {
+    if (playing) return
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'SELECT' || tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      if (e.key === '[' || e.key === ']') { e.preventDefault(); stepWeek(e.key === ']' ? 1 : -1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [playing, stepWeek])
 
-  const weeks = season?.weeks ?? []
   const seg = (on: boolean) => `rounded-lg px-3 py-1.5 text-sm font-semibold transition ${on ? 'bg-accent text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`
   const current = playing?.items[playing.index]
   const selectedTeam = teams.find(t => t.name === team)
@@ -179,6 +206,9 @@ export default function App() {
     : allWeeks
       ? 'No highlights published for this season yet.'
       : 'No highlights published for this week yet.'
+  const goalsEmpty = league === 'ingiltere-premier-ligi' || league === 'ispanya-la-liga'
+    ? 'Full-match highlights only — no per-goal clips.'
+    : 'No goal clips published yet.'
 
   return (
     <div className="mx-auto max-w-7xl overflow-x-hidden px-4 pb-24 pt-6 md:px-8">
@@ -266,7 +296,7 @@ export default function App() {
           {!teamMode && (
             <WeekRail weeks={weeks} round={round ?? 'all'} onPick={setRound} className="mb-5 flex md:hidden" horizontal />
           )}
-          {list.isLoading && (
+          {list.isLoading && !list.data && (
             <div>
               {(teamMode || allWeeks) && <p className="mb-4 text-sm text-white/60"><span className="mr-2 inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-accent align-middle" />Loading the whole season ({weeks.length} weeks)…</p>}
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -283,12 +313,12 @@ export default function App() {
           {list.data && !goalsView && matches.length === 0 && (
             <div className="glass fade-up rounded-2xl p-8 text-center text-white/60 sm:p-12">
               {emptyMsg}
-              <p className="mt-2 text-sm text-white/40">They usually appear a few hours after kick-off. If loading fails, tap Retry.</p>
+              <p className="mt-2 text-sm text-white/40">They usually appear a few hours after kick-off.</p>
             </div>
           )}
           {list.data && goalsView && (
             <GoalsGrid groups={groups} label={showWeekLabels ? weekName : undefined} onPlay={playGoal}
-              firstWeek={ordered[0] ? weekName(ordered[0].m) : ''} onPlayAll={playAll} />
+              firstWeek={ordered[0] ? weekName(ordered[0].m) : ''} onPlayAll={playAll} empty={goalsEmpty} />
           )}
           {!goalsView && matches.length > 0 && (
             <div className="space-y-10">
@@ -316,7 +346,7 @@ export default function App() {
           <p>Pick a league and season. Highlights open on every week at once — use the week list on the left (chips on a phone) to jump to one week, or All to see the season. Tap a match to play on this page.</p>
           <p><b className="text-white/60">HD</b> is on by default for Trendyol Süper Lig (official beIN SPORTS Türkiye YouTube özet) and Premier League (official NBC Sports). Goal clips stay on the standard feed. Turn HD off to use the beIN cut. New matchdays appear automatically.</p>
           <p><b className="text-white/60">İspanya La Liga</b> covers 2025/2026 and 2026/2027. Full-match highlights appear after each game; Goals mode stays empty until individual goal clips are published (same as Premier League).</p>
-          <p>Keyboard: space / k play · ← → seek 10s · n / p next/prev · f fullscreen · m mute · c clips list · Esc close.</p>
+          <p>Keyboard: space / k play · ← → seek 10s · n / p next/prev · f fullscreen · m mute · c clips list · [ / ] previous/next week · Esc close.</p>
         </div>
       </details>
     </div>
@@ -326,6 +356,10 @@ export default function App() {
 function WeekRail({ weeks, round, onPick, className = '', horizontal = false }: {
   weeks: Week[]; round: RoundSel; onPick: (r: RoundSel) => void; className?: string; horizontal?: boolean
 }) {
+  const selected = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    selected.current?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' })
+  }, [round])
   const chip = (on: boolean) =>
     `shrink-0 rounded-lg px-3 py-2 text-left text-sm font-semibold transition ${on ? 'bg-accent text-black shadow' : 'text-white/70 hover:bg-white/5 hover:text-white'}`
   return (
@@ -334,11 +368,12 @@ function WeekRail({ weeks, round, onPick, className = '', horizontal = false }: 
       : 'glass sticky top-4 flex w-44 shrink-0 flex-col gap-1 overflow-y-auto rounded-2xl p-2 max-h-[calc(100vh-6rem)]'
     } ${className}`}>
       {!horizontal && <p className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-white/40">Week</p>}
-      <button type="button" aria-pressed={round === 'all'} onClick={() => onPick('all')} className={chip(round === 'all')}>
+      <button type="button" ref={round === 'all' ? selected : undefined} aria-pressed={round === 'all'} onClick={() => onPick('all')} className={chip(round === 'all')}>
         All weeks
       </button>
       {weeks.map(w => (
-        <button key={w.round} type="button" aria-pressed={round === w.round} aria-current={w.is_current ? 'date' : undefined}
+        <button key={w.round} type="button" ref={round === w.round ? selected : undefined}
+          aria-pressed={round === w.round} aria-current={w.is_current ? 'date' : undefined}
           onClick={() => onPick(w.round)} className={`${chip(round === w.round)} ${horizontal ? '' : 'flex items-center justify-between gap-2'}`}>
           <span className="flex items-center gap-2">{w.name}{w.is_current && <span className={`h-1.5 w-1.5 rounded-full ${round === w.round ? 'bg-black/50' : 'bg-accent'}`} aria-label="Current week" />}</span>
         </button>

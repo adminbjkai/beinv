@@ -1,5 +1,10 @@
 # Changelog
 
+## v2.7.1 — 2026-08-24
+- **Parity / convenience**: All-weeks cards are grouped under week section headers on Android and tvOS (same as web). Changing season on tvOS resets to All weeks. HD last-used state is restored on web when the URL does not set `hd`. Week rail scrolls the current selection into view; `[` / `]` steps weeks on web. Native clients ping `beinv.bjk.ai` in the background after a week/season loads so remuxes are warming before the first tap.
+- **tvOS**: Retry reloads All weeks (was only the single-week fetch). HD is a `Toggle`. UI tests tolerate the week rail in the focus path. `-reset` clears `allWeeks`.
+- **Docs** aligned with FEATURES v2.7. Android debug APK walked on Pixel_9 (HD on/off, City–Bournemouth, La Liga 2025/26, Goals Play all). tvOS **installed and launched** on the Living Room Apple TV 4K. Remaining: [NATIVE_RESUME.md](NATIVE_RESUME.md) (1080p probe, Clips-tab remote walk, v2.7.1 SPA deploy).
+
 ## v2.7 — 2026-08-24
 - **Premier League HD**: official NBC Sports YouTube full-match highlights (`Manchester City v. Bournemouth | PREMIER LEAGUE HIGHLIGHTS | 8/23/2026 | NBC Sports`, match `1510542` = `8bWcZxr_bKE`) remuxed the same way as Süper Lig. Matching uses club aliases + kickoff date so prior seasons do not collide.
 - **HD on by default** for Trendyol Süper Lig and Premier League. Toggle still turns it off (beIN cut). Goal clips stay on beIN. Native HD/La Liga playback goes through `https://beinv.bjk.ai/video/…`.

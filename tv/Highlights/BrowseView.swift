@@ -30,7 +30,7 @@ final class BrowseModel: ObservableObject {
         let d = UserDefaults.standard
         // `-reset` (used by the UI test) starts from defaults instead of the remembered selection
         if CommandLine.arguments.contains("-reset") {
-            for k in ["league", "mode", "season", "week", "team"] { d.removeObject(forKey: k) }
+            for k in ["league", "mode", "season", "week", "team", "allWeeks"] { d.removeObject(forKey: k) }
         }
         league = League.all.first { $0.id == d.string(forKey: "league") } ?? League.all[0]
         mode = Mode(rawValue: d.string(forKey: "mode") ?? "") ?? .highlights
@@ -79,6 +79,7 @@ final class BrowseModel: ObservableObject {
     func selectSeason(_ id: Int?) {
         guard id != seasonId else { return }
         restoreSavedWeek = false
+        allWeeks = true
         seasonId = id
     }
 
@@ -95,7 +96,10 @@ final class BrowseModel: ObservableObject {
         loading = true; error = nil
         do {
             let m = try await API.shared.matches(league: league, seasonId: sid, round: r)
-            if sid == seasonId && r == round { matches = m }
+            if sid == seasonId && r == round {
+                matches = m
+                Task { await API.shared.warm(league: league, seasonId: sid, round: r) }
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -117,6 +121,7 @@ final class BrowseModel: ObservableObject {
             if sid == seasonId {
                 seasonMatches = all
                 if team == nil, let saved = prefs.string(forKey: "team"), teams.contains(where: { $0.name == saved }) { team = saved }
+                Task { await API.shared.warm(league: league, seasonId: sid, round: nil) }
             }
         } catch {
             self.error = error.localizedDescription
@@ -134,7 +139,10 @@ final class BrowseModel: ObservableObject {
     func retry() {
         Task {
             if seasons.isEmpty { await loadSeasons() }
-            else if mode == .team { await loadSeason() }
+            else if mode == .team || allWeeks {
+                seasonMatches = []
+                await loadSeason()
+            }
             else { await loadMatches() }
         }
     }
@@ -216,11 +224,19 @@ struct BrowseView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(model.weeks) { w in
-                        Button(w.weekName ?? "Week \(w.round ?? 0)") {
+                        Button {
                             model.allWeeks = false
                             model.round = w.round
+                        } label: {
+                            HStack(spacing: 8) {
+                                Text(w.weekName ?? "Week \(w.round ?? 0)")
+                                if w.currentWeekForFixture == true {
+                                    Circle().fill(Theme.accent).frame(width: 8, height: 8)
+                                }
+                            }
                         }
                         .foregroundStyle(!model.allWeeks && model.round == w.round ? Theme.accent : .primary)
+                        .accessibilityIdentifier("week.\(w.round ?? 0)")
                     }
                 }
             }
@@ -237,8 +253,8 @@ struct BrowseView: View {
                     .accessibilityIdentifier("mode.\(m.rawValue)")
             }
             if model.league.usesHdToggle {
-                Button(model.hd ? "HD on" : "HD off") { model.hd.toggle() }
-                    .foregroundStyle(model.hd ? Theme.accent : .primary)
+                Toggle("HD", isOn: $model.hd)
+                    .tint(Theme.accent)
                     .accessibilityIdentifier("hd.toggle")
             }
             Spacer()
@@ -358,18 +374,36 @@ struct BrowseView: View {
     }
 
     private var matchGrid: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 50) {
-                ForEach(model.visible) { m in
-                    Button {
-                        let r = m.round ?? model.round ?? 0
-                        let sid = model.seasonId ?? 0
-                        playback = Playback(clips: m.playable(league: model.league, seasonId: sid, round: r, hd: model.hd).playlist)
-                    } label: {
-                        MatchCard(match: m, subtitle: (model.mode == .team || model.allWeeks) ? model.weekName(m.round) : nil)
+        let groups = Dictionary(grouping: model.visible) { $0.round ?? 0 }
+        let rounds = groups.keys.sorted()
+        let headers = model.mode == .team || model.allWeeks || rounds.count > 1
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: 28) {
+                ForEach(rounds, id: \.self) { r in
+                    let ms = (groups[r] ?? []).sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+                    if headers {
+                        HStack(spacing: 12) {
+                            Text(model.weekName(r))
+                                .font(.headline)
+                                .padding(.horizontal, 12).padding(.vertical, 6)
+                                .background(Theme.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .foregroundStyle(.black)
+                            Text("\(ms.count) \(ms.count == 1 ? "match" : "matches")")
+                                .font(.callout).foregroundStyle(Theme.secondaryText)
+                        }
                     }
-                    .buttonStyle(.card)
-                    .onLongPressGesture { clips = m }
+                    LazyVGrid(columns: columns, spacing: 50) {
+                        ForEach(ms) { m in
+                            Button {
+                                let sid = model.seasonId ?? 0
+                                playback = Playback(clips: m.playable(league: model.league, seasonId: sid, round: r, hd: model.hd).playlist)
+                            } label: {
+                                MatchCard(match: m, subtitle: headers ? model.weekName(m.round) : nil)
+                            }
+                            .buttonStyle(.card)
+                            .onLongPressGesture { clips = m }
+                        }
+                    }
                 }
             }
             .padding(.vertical, 40)
@@ -383,7 +417,7 @@ struct BrowseView: View {
             if groups.isEmpty { empty("No goal clips for this selection.").padding(.top, 80) }
             LazyVStack(alignment: .leading, spacing: 30) {
                 ForEach(groups, id: \.0.id) { m, rows in
-                    MatchHeader(match: m, week: model.mode == .team ? model.weekName(m.round) : nil)
+                    MatchHeader(match: m, week: (model.mode == .team || model.allWeeks) ? model.weekName(m.round) : nil)
                     LazyVGrid(columns: columns, spacing: 40) {
                         ForEach(rows) { r in
                             Button { playback = Playback(clips: all, start: all.firstIndex { $0.id == r.clip.id } ?? 0) } label: {

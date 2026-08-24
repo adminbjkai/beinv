@@ -62,6 +62,17 @@ actor API {
         return all
     }
 
+    /// Ask the remux host to load this week/season so HD files start warming.
+    func warm(league: League, seasonId: Int, round: Int?) async {
+        let path = if let r = round {
+            "\(Beinv.host)/api/leagues/\(league.id)/seasons/\(seasonId)/weeks/\(r)"
+        } else {
+            "\(Beinv.host)/api/leagues/\(league.id)/seasons/\(seasonId)/matches"
+        }
+        guard let url = URL(string: path) else { return }
+        _ = try? await get(url)
+    }
+
     private func get(_ url: URL) async throws -> Data {
         var req = URLRequest(url: url)
         req.setValue(userAgent, forHTTPHeaderField: "User-Agent")

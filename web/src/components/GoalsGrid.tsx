@@ -8,12 +8,13 @@ type Props = {
   onPlayAll: () => void
   /** week label of the first playlist item (§2b button text) */
   firstWeek: string
+  empty?: string
 }
 
 /** Goal clips grouped by match (running score + scoring team per card), plus "Play all" over the same filtered set. */
-export default function GoalsGrid({ groups, label, onPlay, onPlayAll, firstWeek }: Props) {
+export default function GoalsGrid({ groups, label, onPlay, onPlayAll, firstWeek, empty = 'No goal clips published yet.' }: Props) {
   const total = groups.reduce((n, g) => n + g.rows.length, 0)
-  if (!total) return <div className="glass fade-up rounded-2xl p-12 text-center text-white/60">No goal clips published yet.</div>
+  if (!total) return <div className="glass fade-up rounded-2xl p-12 text-center text-white/60">{empty}</div>
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-3">

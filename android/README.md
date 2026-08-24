@@ -4,7 +4,7 @@ Small native Android app (Kotlin, Jetpack Compose, Media3 ExoPlayer) that lists 
 match highlights from beinsports.com.tr (Süper Lig, Premier League, İspanya La Liga) and plays them.
 Süper Lig / Premier League catalogs come from beIN; HD full-highlights and İspanya La Liga play from `https://beinv.bjk.ai` ([UPSTREAM_API.md](../docs/UPSTREAM_API.md) §D–F).
 
-**v2.7 source is on `main` but the APK has not been built.** Resume on a Mac with Android Studio: **[docs/NATIVE_RESUME.md](../docs/NATIVE_RESUME.md)** (checklist, files touched, live URLs to match).
+**v2.7.1 debug APK assembled and walked on Pixel_9.** Remaining rows (PiP / 1080p probe): **[docs/NATIVE_RESUME.md](../docs/NATIVE_RESUME.md)** §3.
 
 ## Features (v2.7 spec, `docs/FEATURES.md`)
 
@@ -13,7 +13,7 @@ Süper Lig / Premier League catalogs come from beIN; HD full-highlights and İsp
   **HD** (Super Lig / Premier League, default on) → **Week rail** (All weeks + rounds, hidden in By team) → content. League, season/week (per league),
   mode, team (per league), the `Matches` | `Goals` sub-switch and the `Only <Team> goals` toggle are remembered in
   SharedPreferences and restored on relaunch (and when returning from the player).
-- **Highlights**: match grid, goal-count badge.
+- **Highlights**: match grid, goal-count badge. All weeks groups cards under `N. Hafta · M matches`.
 - **Goals**: goal clips grouped by match (header: home logo, scoreline, away logo). Each card shows minute, scorer,
   scoring team (logo + name from `eventTeamSide` Home/Away) and the **running score after that goal** with the
   scoring side in emerald (unknown side → "—", score unchanged). **Play all** plays the filtered list.
@@ -67,11 +67,12 @@ adb shell am start -n ai.bjk.highlights/.MainActivity
     lenient kotlinx-serialization models (`MatchEvent.eventTeamSide` → `Side`),
     `Match.goalRows(round, week)` running-score walk (`GoalRow`), `orderedPlaylist()`, `Clip`/`Playlist`/`Mode`
   - `Api.kt` – OkHttp: beIN seasons/weeks for Super Lig + PL; La Liga weeks from `beinv.bjk.ai`;
-    in-memory caches, concurrent per-season fetch
+    in-memory caches, concurrent per-season fetch, `warm()` pings `beinv.bjk.ai` so remuxes start early
   - `Prefs.kt` – SharedPreferences (league, season/week per league, mode, team per league,
     By-team sub-switch/toggle, **`hd` default true**, **`allWeeks` default true**)
   - `BrowseScreen.kt` – top bar (league/season/mode/HD), `WeekRail` (left on wide, chips on phone;
-    All weeks default), match grid, goal cards (`GoalCard`), team view + `Only <Team> goals`, skeletons
+    All weeks default, current-week dot), All-weeks **week section headers**, match grid, goal cards
+    (`GoalCard`), team view + `Only <Team> goals`, remux-host warm, skeletons
   - `PlayerScreen.kt` – ExoPlayer playlist `PlayerView`, fullscreen/immersive, week-grouped clip list (`clipRows`), landscape drawer, `NextPrevBar`
   - `Theme.kt` – dark Material3 scheme (emerald accent, no purple)
 - `app/src/main/res/` – strings, theme, adaptive launcher icon (vector only)

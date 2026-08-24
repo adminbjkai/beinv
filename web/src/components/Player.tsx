@@ -104,12 +104,14 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
 
   // new item → reset display state and start playback
   useEffect(() => {
-    setTime(0); setDur(0); setBuffered(0); setErr(false); setPrep(false); poke()
-    const t = window.setTimeout(() => setPrep(true), 1200)
+    setTime(0); setDur(0); setBuffered(0); setErr(false)
+    setPrep(item.src.includes('q=hd'))
+    poke()
+    const t = window.setTimeout(() => setPrep(true), 400)
     const el = v.current
     if (el) el.play().catch(() => {})
     return () => window.clearTimeout(t)
-  }, [item.key, poke])
+  }, [item.key, item.src, poke])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -120,8 +122,8 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
       if (tag === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return
       switch (e.key) {
         case ' ': case 'k': e.preventDefault(); toggle(); break
-        case 'ArrowLeft': seekBy(-10); break
-        case 'ArrowRight': seekBy(10); break
+        case 'ArrowLeft': e.preventDefault(); seekBy(-10); break
+        case 'ArrowRight': e.preventDefault(); seekBy(10); break
         case 'f': fullscreen(); break
         case 'm': setMuted(m => !m); break
         case 'n': step(1); break

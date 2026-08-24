@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -130,6 +131,14 @@ fun BrowseScreen(onPlay: (Playlist) -> Unit) {
         }
     }
     LaunchedEffect(hd, allWeeks) { prefs.hd = hd; prefs.allWeeks = allWeeks }
+    LaunchedEffect(league, seasonId, allWeeks, round, mode, matches, seasonData) {
+        val sid = seasonId ?: return@LaunchedEffect
+        if (mode == Mode.ByTeam || allWeeks) {
+            if (seasonData is Load.Ok) runCatching { Api.warm(league, sid) }
+        } else if (round != null && matches is Load.Ok) {
+            runCatching { Api.warm(league, sid, round) }
+        }
+    }
 
     fun playMatch(e: Entry) {
         val sid = seasonId ?: return
@@ -324,14 +333,45 @@ private fun Content(
 @Composable
 private fun MatchGrid(entries: List<Entry>, onOpen: (Entry) -> Unit) {
     val wide = LocalConfiguration.current.screenWidthDp > 600
+    val cols = if (wide) 3 else 2
+    val groups = remember(entries) { entries.groupBy { it.round }.toSortedMap() }
+    val headers = groups.size > 1
     LazyVerticalGrid(
-        columns = GridCells.Fixed(if (wide) 3 else 2),
+        columns = GridCells.Fixed(cols),
         contentPadding = PaddingValues(16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(entries, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { e ->
-            MatchCard(e.match, e.week) { onOpen(e) }
+        groups.forEach { (round, es) ->
+            if (headers) {
+                item(key = "h$round", span = { GridItemSpan(maxLineSpan) }) {
+                    val name = es.first().week ?: "Week $round"
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            name,
+                            color = Background,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Emerald)
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                        Text(
+                            "${es.size} ${if (es.size == 1) "match" else "matches"}",
+                            color = TextGray,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
+                }
+            }
+            items(es, key = { (w, _, m) -> "${w}_${m.matchId ?: m.hashCode()}" }) { e ->
+                MatchCard(e.match, e.week) { onOpen(e) }
+            }
         }
     }
 }
@@ -342,32 +382,42 @@ private fun WeekRail(
     onAll: () -> Unit, onWeek: (Int) -> Unit,
     modifier: Modifier = Modifier, horizontal: Boolean = false,
 ) {
-    val chip: @Composable (Boolean, String, () -> Unit) -> Unit = { on, label, click ->
+    val chip: @Composable (Boolean, String, Boolean, () -> Unit) -> Unit = { on, label, current, click ->
         val shape = RoundedCornerShape(10.dp)
-        Text(
-            label,
-            color = if (on) Background else OnDark,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .then(if (horizontal) Modifier else Modifier.fillMaxWidth())
                 .clip(shape)
                 .background(if (on) Emerald else Background.copy(alpha = 0.4f))
                 .clickable(onClick = click)
                 .padding(horizontal = 10.dp, vertical = 8.dp),
-        )
+        ) {
+            Text(
+                label,
+                color = if (on) Background else OnDark,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = if (horizontal) Modifier else Modifier.weight(1f),
+            )
+            if (current) Box(
+                Modifier.size(6.dp).clip(CircleShape)
+                    .background(if (on) Background.copy(alpha = 0.55f) else Emerald)
+            )
+        }
     }
     if (horizontal) {
         LazyRow(
             modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item { chip(allWeeks, "All weeks", onAll) }
+            item { chip(allWeeks, "All weeks", false, onAll) }
             items(weeks, key = { it.round ?: it.hashCode() }) { w ->
                 val r = w.round ?: return@items
-                chip(!allWeeks && round == r, w.weekName ?: "Week $r") { onWeek(r) }
+                chip(!allWeeks && round == r, w.weekName ?: "Week $r", w.currentWeekForFixture == true) { onWeek(r) }
             }
         }
     } else {
@@ -376,10 +426,10 @@ private fun WeekRail(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text("Week", color = TextGray, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 4.dp))
-            chip(allWeeks, "All weeks", onAll)
+            chip(allWeeks, "All weeks", false, onAll)
             weeks.forEach { w ->
                 val r = w.round ?: return@forEach
-                chip(!allWeeks && round == r, w.weekName ?: "Week $r") { onWeek(r) }
+                chip(!allWeeks && round == r, w.weekName ?: "Week $r", w.currentWeekForFixture == true) { onWeek(r) }
             }
         }
     }
@@ -622,7 +672,7 @@ private fun MatchCard(m: Match, weekLabel: String?, onClick: () -> Unit) {
         ) {
             AsyncImage(m.homeTeam?.logo, m.homeTeam?.name, Modifier.size(22.dp))
             Text(
-                "${scoreText(m.homeTeam)} : ${scoreText(m.awayTeam)}",
+                "${scoreText(m.homeTeam)}–${scoreText(m.awayTeam)}",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
                 modifier = Modifier.weight(1f),

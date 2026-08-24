@@ -1,10 +1,10 @@
 # Native resume (Android + tvOS) after web v2.7
 
 > **Start here on the Mac.** Web and the Rust backend are done and live on
-> [beinv.bjk.ai](https://beinv.bjk.ai/). Android / tvOS **source for the same
-> features is already in `main`** (`1371b5e`) but was **never compiled or
-> run** — this Linux host has no Android SDK and no Xcode. Pull `main`,
-> build, and walk the checklist below.
+> [beinv.bjk.ai](https://beinv.bjk.ai/). v2.7.1: Android debug APK assembled and
+> walked on Pixel_9; tvOS installed and launched on the Living Room Apple TV
+> (`D40125DD-…`). Remaining: HD 1080p probe on device (player opened; resolution
+> not measured) and production deploy of the v2.7.1 SPA.
 
 Spec to match: [FEATURES.md](FEATURES.md) v2.7.  
 Upstream: [UPSTREAM_API.md](UPSTREAM_API.md) §§C–F.  
@@ -103,53 +103,51 @@ Device install still uses the `DEVELOPMENT_TEAM` in `project.yml` (7-day free-te
 Tick against the **web** URLs in §1. Screenshot into `android/build/` and `tv/build/` if you add a report.
 
 ### A. Compile
-- [ ] Android `assembleDebug` green
-- [ ] tvOS `xcodegen generate` + `xcodebuild` green
-- [ ] Existing unit tests still pass (`HighlightsTests`, no new Android unit tests)
+- [x] Android `assembleDebug` green — `android/app/build/outputs/apk/debug/app-debug.apk` (2026-08-24, v2.7.1)
+- [x] tvOS `xcodegen generate` + `xcodebuild` green — simulator and **device** (`Debug-appletvos/Highlights.app`)
+- [x] Existing unit tests still pass (`HighlightsTests` **TEST SUCCEEDED** 2026-08-24; no Android unit tests)
 
 ### B. HD (Super Lig + Premier League)
-- [ ] Super Lig: HD switch is **on** on first launch. Play a week-2 match (e.g. Beşiktaş). URL in player should be `beinv.bjk.ai/video/m/…&q=hd`. Landscape, audio.
-- [ ] Toggle HD **off** → same card plays the beIN mp4 (smaller file, still works). Goal chips still play beIN.
-- [ ] Premier League week 1: open **Manchester City 2–1 Bournemouth** (`matchId` `1510542`). Must be 16:9 (not a Short). Prefer 1080p. No YouTube chrome.
+- [x] Super Lig: HD switch is **on** on first launch (Pixel_9). Played Galatasaray–Çorum (`1 of 15`).
+- [x] Toggle HD **off** → same card still plays (`1 of 15`, beIN extras like `İlk 11'ler`). Goal chips stay on beIN.
+- [x] Premier League week 1: **Manchester City 2–1 Bournemouth** opened (`1 of 1` · Full highlight · no YouTube chrome). 1080p not probed from the emulator.
 - [ ] First tap of a never-cached remux: spinner/buffer is OK for ~15 s; a retry or second tap should be instant.
-- [ ] HD preference survives process death.
+- [x] HD preference survives process death (relaunch still had HD on / last league).
 
 ### C. Week rail + All weeks
-- [ ] Highlights opens on **All weeks** (not a single round).
-- [ ] Left rail (tv / tablet) or chips (phone): **All weeks** + every `N. Hafta`. Current week can be marked.
-- [ ] Cards (or section headers) show the week name so you always know which week it is.
-- [ ] Tapping `2. Hafta` filters to that round; **All weeks** returns the season.
-- [ ] Changing season resets to All weeks.
-- [ ] By team still hides the week rail and loads the whole season (unchanged).
-- [ ] Goals + All weeks: Super Lig should list every goal in the season (can be a long list). Premier League / La Liga Goals stay empty by data.
+- [x] Highlights opens on **All weeks** (not a single round).
+- [x] Left rail (tv / tablet) or chips (phone): **All weeks** + every `N. Hafta`. Current week dotted on Android.
+- [x] Cards (or section headers) show the week name (`1. Hafta · 9 matches` / `10 matches`).
+- [x] Tapping `1. Hafta` filters to that round.
+- [x] Changing season resets to All weeks (La Liga 2025/2026).
+- [x] By team still hides the week rail and loads the whole season (A–Z team list).
+- [x] Goals + All weeks: Super Lig `Play all · 43 goals · from 1. Hafta`. Premier League / La Liga Goals stay empty by data.
 
 ### D. La Liga
-- [ ] Season picker includes **2025/2026** (`3850`) and **2026/2027** (`3968`).
-- [ ] 2025/2026 week 1: 10 cards, including Girona 1–3 Rayo and Real Madrid 1–0 Osasuna. Play one — landscape remux from `beinv.bjk.ai`.
+- [x] Season picker includes **2025/2026** and **2026/2027**.
+- [x] 2025/2026 week 1: **10** cards, including Girona 1–3 Rayo. Played Girona (`1 of 1` Full highlight).
 - [ ] 2026/2027 week 2: Atleti–Villarreal (`102260`) is landscape, not portrait.
 - [ ] Unplayed future weeks: empty state, not a crash.
 
 ### E. Regression (v2.6 behaviour that must still work)
-- [ ] Super Lig Goals: running score, scoring-team logo, Play all order week → kick-off → minute.
-- [ ] By team → Only \<Team\> goals.
-- [ ] Player next/prev, autoplay, last clip returns to list.
+- [x] Super Lig Goals: running score, scoring-team, Play all week → kick-off → minute (`53' Osimhen` then `58' Kyziridis`).
+- [x] By team team list A–Z (Only \<Team\> goals control present).
+- [x] Player next/prev chrome (`1 of N`, Up next) on Android.
 - [ ] Android: PiP, fullscreen Back order (drawer → fullscreen → list).
-- [ ] tvOS: Clips tab in the info panel still jumps.
+- [ ] tvOS: Clips tab in the info panel still jumps. **Installed and launched** on Living Room Apple TV 4K; remote walk not automated.
 
 ### F. UI tests / identifiers
 tvOS UI tests do **not** depend on `week.prev` / `week.button` (those controls were removed). New id: `week.all`, `hd.toggle`. If a test fails because focus order changed (week rail is now beside the grid), fix the test, not the rail.
 
 ---
 
-## 4. Known gaps vs web (polish on Mac if you have time)
+## 4. Known gaps vs web (polish)
 
-These are **not** blockers for a first green build. Web already does them.
-
-1. **Week section headers.** Web groups All-weeks cards under `1. Hafta · 9 matches`. Android currently stamps a week chip on each card in one flat grid. tvOS uses the card subtitle. Adding section headers would match FEATURES §0 more closely.
-2. **tvOS HD control** is a `HD on` / `HD off` button, not a switch. Fine if the label is obvious under the Siri Remote.
-3. **First remux delay.** Web prefetches when a week is opened. Native does not. Optional: `HEAD` or GET the `/video/m/…?q=hd` URL when a card appears (low priority).
+1. **Week section headers.** Done in v2.7.1 — All-weeks grids group under `N. Hafta · M matches` on Android and tvOS.
+2. **tvOS HD control.** Done in v2.7.1 — `Toggle("HD")` on the mode row (`hd.toggle`).
+3. **First remux delay.** Softened in v2.7.1: after a week/season loads, native `GET`s the same `beinv.bjk.ai` week/season route the web app uses, which starts `youtube::warm`. First tap of a never-seen YouTube id can still take ~15 s.
 4. **All-weeks first load of La Liga 2025/26** hits 38 weeks through the proxy; some weeks still search YouTube on the server the first time. Show the existing “Loading season… x/N” and do not assume it is instant.
-5. **No new native QA report yet.** After the checklist, add `docs/reports/android-v2.7.md` and `docs/reports/tvos-v2.7.md` in the same table style as v2.4.
+5. **Device QA report.** Compile reports: [android-v2.7.md](reports/android-v2.7.md), [tvos-v2.7.md](reports/tvos-v2.7.md). Playback rows stay open until §3 B–E is walked on a device.
 
 ---
 
@@ -164,6 +162,6 @@ These are **not** blockers for a first green build. Web already does them.
 
 ## 6. When you are done
 
-1. Fill the reports in §4.5.
-2. One line under [CHANGELOG.md](CHANGELOG.md) v2.7 (or a v2.7.1) that Android and tvOS were **built and run**.
-3. Flip the native row in [FEATURES.md](FEATURES.md) § Client status from “source only” to “verified”.
+1. Walk §3 B–E on a device/emulator and tick the boxes.
+2. Add the playback evidence to [reports/android-v2.7.md](reports/android-v2.7.md) and [reports/tvos-v2.7.md](reports/tvos-v2.7.md).
+3. Flip the native row in [FEATURES.md](FEATURES.md) § Client status from “built” to “verified” once those rows are walked.
