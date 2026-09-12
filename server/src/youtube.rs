@@ -5,7 +5,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use tokio::sync::{Mutex, Semaphore};
@@ -27,6 +27,28 @@ fn cache_dir() -> PathBuf {
 static JOBS: Mutex<Option<HashMap<String, Arc<Mutex<()>>>>> = Mutex::const_new(None);
 static WARM: Semaphore = Semaphore::const_new(2);
 
+/// Videos that recently failed extraction (geo-blocked, removed, private).
+/// Cached so week loads stop re-spawning doomed yt-dlp runs. Retry after 24 h.
+static FAILED: Mutex<Option<HashMap<String, Instant>>> = Mutex::const_new(None);
+const FAILURE_TTL: Duration = Duration::from_secs(86_400);
+
+pub async fn failed_recently(id: &str) -> bool {
+    let mut g = FAILED.lock().await;
+    let map = g.get_or_insert_with(HashMap::new);
+    if let Some(t) = map.get(id) {
+        if t.elapsed() < FAILURE_TTL {
+            return true;
+        }
+    }
+    map.retain(|_, t| t.elapsed() < FAILURE_TTL);
+    false
+}
+
+async fn mark_failed(id: &str) {
+    let mut g = FAILED.lock().await;
+    g.get_or_insert_with(HashMap::new).insert(id.to_string(), Instant::now());
+}
+
 /// Start a background remux so the first click on a week is usually instant.
 pub fn warm(id: &str) {
     if !valid_id(id) {
@@ -34,6 +56,9 @@ pub fn warm(id: &str) {
     }
     let id = id.to_string();
     tokio::spawn(async move {
+        if failed_recently(&id).await {
+            return; // geo-blocked/removed: skip the doomed yt-dlp run
+        }
         let Ok(_p) = WARM.acquire().await else { return };
         if let Err(e) = ensure_mp4(&id).await {
             tracing::warn!("prefetch {id}: {e}");
@@ -81,6 +106,7 @@ pub async fn ensure_mp4(id: &str) -> anyhow::Result<PathBuf> {
         let _ = tokio::fs::remove_file(&tmp).await;
         if !ytdlp(&tmp, &url, false, Duration::from_secs(180)).await {
             let _ = tokio::fs::remove_file(&tmp).await;
+            mark_failed(id).await;
             anyhow::bail!("yt-dlp failed for {id}");
         }
     }

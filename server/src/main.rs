@@ -69,14 +69,28 @@ async fn load_week(app: &App, lg: League, season: u64, round: u32) -> anyhow::Re
             }
             for m in &ms {
                 if !m.highlight_url.is_empty() {
+                    let yt = m.highlight_url.strip_prefix("yt:");
+                    if let Some(id) = yt {
+                        if youtube::failed_recently(id).await {
+                            tracing::warn!("skip broken yt source m:{} ({id})", m.id);
+                            continue;
+                        }
+                    }
                     app.sources.insert(format!("m:{}", m.id), m.highlight_url.clone()).await;
-                    if let Some(yt) = m.highlight_url.strip_prefix("yt:") {
+                    if let Some(yt) = yt {
                         youtube::warm(yt);
                     }
                 }
                 if !m.hd_url.is_empty() {
+                    let yt = m.hd_url.strip_prefix("yt:");
+                    if let Some(id) = yt {
+                        if youtube::failed_recently(id).await {
+                            tracing::warn!("skip broken yt source hd:{} ({id})", m.id);
+                            continue;
+                        }
+                    }
                     app.sources.insert(format!("hd:{}", m.id), m.hd_url.clone()).await;
-                    if let Some(yt) = m.hd_url.strip_prefix("yt:") {
+                    if let Some(yt) = yt {
                         youtube::warm(yt);
                     }
                 }
@@ -191,10 +205,21 @@ async fn video(
             app.sources.get(&key).await.ok_or(StatusCode::NOT_FOUND)?
         }
     };
-    let mp4 = app.resolved.try_get_with(src.clone(), video::resolve(&app.noredirect, &src)).await.map_err(|e| {
-        tracing::warn!("resolve failed: {e}");
-        StatusCode::BAD_GATEWAY
-    })?;
+    let mp4 = if let Some(yt) = src.strip_prefix("yt:") {
+        if youtube::failed_recently(yt).await {
+            // Known geo-blocked/removed: fail fast instead of a doomed yt-dlp run.
+            return Err(StatusCode::NOT_FOUND);
+        }
+        app.resolved.try_get_with(src.clone(), video::resolve(&app.noredirect, &src)).await.map_err(|e| {
+            tracing::warn!("resolve failed: {e}");
+            StatusCode::BAD_GATEWAY
+        })?
+    } else {
+        app.resolved.try_get_with(src.clone(), video::resolve(&app.noredirect, &src)).await.map_err(|e| {
+            tracing::warn!("resolve failed: {e}");
+            StatusCode::BAD_GATEWAY
+        })?
+    };
     video::proxy(&app.http, &mp4, &headers).await
 }
 
