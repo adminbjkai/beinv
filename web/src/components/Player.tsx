@@ -35,6 +35,9 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
   const [clips, setClips] = useState(initialClips)
   const [err, setErr] = useState(false)
   const [prep, setPrep] = useState(false)
+  // Gesture feedback: `2x` while held on the right half, or a ±5 s double-tap nudge.
+  const [ffHint, setFfHint] = useState(false)
+  const [seekHint, setSeekHint] = useState(0) // -1 / +1 direction, 0 = none
   const drawer = useRef<HTMLElement>(null)
   const clipsBtn = useRef<HTMLButtonElement>(null)
   const clipsRef = useRef(clips)
@@ -62,6 +65,70 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
     else el.requestFullscreen().catch(() => {})
   }, [])
   const pip = useCallback(() => { const el = v.current; if (el && 'requestPictureInPicture' in el) el.requestPictureInPicture().catch(() => {}) }, [])
+
+  // --- tap gestures (YouTube style) -----------------------------------------
+  // Single tap: only toggles the control chrome, never pause/play.
+  // Double tap left/right half: ±5 s. Press-and-hold right half: 2x while held.
+  const tapTimer = useRef<number | undefined>(undefined)
+  const lastTap = useRef(0)
+  const holdTimer = useRef<number | undefined>(undefined)
+  const held2x = useRef(false)
+  const prevRate = useRef(1)
+
+  const onSurfaceTap = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement
+    if (t.closest('button, input, aside, a')) return
+    if (clipsRef.current && drawer.current?.contains(t)) return
+    poke()
+    const now = Date.now()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const left = e.clientX - rect.left < rect.width / 2
+    if (now - lastTap.current < 300) {
+      window.clearTimeout(tapTimer.current)
+      lastTap.current = 0
+      seekBy(left ? -5 : 5)
+      setSeekHint(left ? -1 : 1)
+      window.setTimeout(() => setSeekHint(0), 600)
+    } else {
+      lastTap.current = now
+      window.clearTimeout(tapTimer.current)
+      tapTimer.current = window.setTimeout(() => { setShow(s => !s) }, 300)
+    }
+  }, [poke, seekBy])
+
+  const onHoldStart = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const t = e.target as HTMLElement
+    if (t.closest('button, input, aside, a')) return
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    const rect = e.currentTarget?.getBoundingClientRect()
+    if (!rect || e.clientX - rect.left < rect.width / 2) return
+    holdTimer.current = window.setTimeout(() => {
+      const el = v.current
+      if (el && !el.paused) {
+        prevRate.current = el.playbackRate
+        el.playbackRate = 2
+        held2x.current = true
+        setFfHint(true)
+      }
+    }, 350)
+  }, [])
+
+  const onHoldEnd = useCallback(() => {
+    window.clearTimeout(holdTimer.current)
+    if (held2x.current) {
+      const el = v.current
+      if (el) el.playbackRate = prevRate.current
+      held2x.current = false
+      setFfHint(false)
+    }
+  }, [])
+
+  useEffect(() => () => {
+    window.clearTimeout(tapTimer.current)
+    window.clearTimeout(holdTimer.current)
+  }, [])
+  // --- end tap gestures ------------------------------------------------------
+
   const step = useCallback((d: number) => {
     const { index, items, onIndex } = latest.current
     const n = index + d
@@ -157,11 +224,24 @@ export default function Player({ items, index, onIndex, onEnd, autoNext, onAutoN
 
   return (
     <div ref={wrap} onMouseMove={poke} onMouseLeave={() => playing && !clips && setShow(false)}
+      onPointerDown={onHoldStart} onPointerUp={onHoldEnd} onPointerCancel={onHoldEnd} onPointerLeave={onHoldEnd}
+      onClick={onSurfaceTap}
       className="player-shell glass control-surface group relative w-full overflow-hidden rounded-2xl bg-black shadow-[0_30px_80px_-20px_rgba(0,0,0,.8)] select-none">
       <div className="player-stage relative aspect-video w-full overflow-hidden bg-black">
         <video ref={v} src={item.src} poster={item.poster} autoPlay playsInline preload="auto"
-          onClick={toggle} onDoubleClick={fullscreen} onError={() => setErr(true)}
+          onDoubleClick={fullscreen} onError={() => setErr(true)}
           className="h-full w-full bg-black object-contain" />
+
+        {ffHint && (
+          <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-3 py-1 text-sm font-bold text-white">
+            2x ▶▶
+          </div>
+        )}
+        {seekHint !== 0 && (
+          <div className={`pointer-events-none absolute top-1/2 -translate-y-1/2 rounded-full bg-black/60 px-4 py-2 text-sm font-bold text-white ${seekHint < 0 ? 'left-4' : 'right-4'}`}>
+            {seekHint < 0 ? '« 5s' : '5s »'}
+          </div>
+        )}
 
         {waiting && !err && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3" role="status">
